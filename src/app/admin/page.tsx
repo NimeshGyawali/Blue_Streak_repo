@@ -6,6 +6,11 @@ import Link from 'next/link';
 import { Users, Bike, Bell, BarChart3 } from 'lucide-react';
 
 export default function AdminDashboardPage() {
+  // In a full implementation, you would fetch these counts from API endpoints
+  const pendingUserVerifications = 0; // Placeholder
+  const pendingRideApprovals = 0; // Placeholder
+  const activeSystemAlerts = 0; // Placeholder
+
   return (
     <div className="space-y-8">
       <PageTitle title="Admin Dashboard" description="Overview and quick access to management tools." />
@@ -17,7 +22,11 @@ export default function AdminDashboardPage() {
             <Users className="h-6 w-6 text-primary" />
           </CardHeader>
           <CardContent>
-            <CardDescription className="mb-4">Verify new users and manage existing accounts.</CardDescription>
+            <CardDescription className="mb-4">
+              Verify new users and manage existing accounts. 
+              {/* Placeholder for dynamic count */}
+              {/* {pendingUserVerifications > 0 ? `${pendingUserVerifications} users pending verification.` : 'No users pending verification.'} */}
+            </CardDescription>
             <Button asChild variant="outline">
               <Link href="/admin/users">Go to User Management</Link>
             </Button>
@@ -30,7 +39,11 @@ export default function AdminDashboardPage() {
             <Bike className="h-6 w-6 text-primary" />
           </CardHeader>
           <CardContent>
-            <CardDescription className="mb-4">Approve new rides, view ride statistics, and manage ride details.</CardDescription>
+            <CardDescription className="mb-4">
+              Approve new rides, view ride statistics, and manage ride details.
+              {/* Placeholder for dynamic count */}
+              {/* {pendingRideApprovals > 0 ? `${pendingRideApprovals} rides pending approval.` : 'No rides pending approval.'} */}
+            </CardDescription>
             <Button asChild variant="outline">
               <Link href="/admin/rides">Go to Ride Management</Link>
             </Button>
@@ -43,7 +56,11 @@ export default function AdminDashboardPage() {
             <Bell className="h-6 w-6 text-primary" />
           </CardHeader>
           <CardContent>
-            <CardDescription className="mb-4">Review system notifications and important alerts.</CardDescription>
+            <CardDescription className="mb-4">
+              Review system notifications and important alerts.
+              {/* Placeholder for dynamic count */}
+              {/* {activeSystemAlerts > 0 ? `${activeSystemAlerts} active alerts.` : 'No active alerts.'} */}
+            </CardDescription>
             <Button asChild variant="outline">
               <Link href="/admin/alerts">View Alerts</Link>
             </Button>
@@ -56,15 +73,17 @@ export default function AdminDashboardPage() {
             <BarChart3 className="h-6 w-6 text-primary" />
           </CardHeader>
           <CardContent>
-            <CardDescription className="mb-4">Analyze ride data, participation, and trends.</CardDescription>
-             {/* Link to be updated if stats get their own page or section */}
-            <Button asChild variant="outline" disabled> 
-              <Link href="/admin/rides#statistics">View Ride Statistics</Link>
+            <CardDescription className="mb-4">Analyze ride data, participation, and trends. (View on Ride Management page)</CardDescription>
+            <Button asChild variant="outline"> 
+              <Link href="/admin/rides">View Ride Statistics</Link>
             </Button>
           </CardContent>
         </Card>
       </div>
-      {/* TODO: Add more dashboard widgets like recent activity, quick stats, etc. */}
+      {/* TODO: Add more dashboard widgets like recent activity, quick stats (e.g., API calls to fetch counts), etc. */}
+      <p className="text-sm text-muted-foreground mt-6">
+        Note: Dynamic counts for pending verifications, approvals, and active alerts will be shown here once backend APIs for these stats are implemented.
+      </p>
     </div>
   );
 }
