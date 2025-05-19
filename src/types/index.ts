@@ -10,6 +10,7 @@ export interface User {
   is_admin?: boolean; 
   is_verified?: boolean; 
   avatarUrl?: string; // URL to the user's avatar image
+  safety_rating?: number | null; // Safety rating from 1 to 5
 }
 
 export interface RidePhoto {
@@ -38,6 +39,7 @@ export interface Ride {
   status: 'Upcoming' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Pending Approval' | 'Rejected';
   thumbnailUrl?: string; // For RideCard, main display image
   photoHints?: string; // For RideCard placeholder, hints for AI image gen for thumbnail
+  distance_km?: number; // Optional: Distance of the ride in kilometers
 }
 
 export interface LeaderboardEntry {
@@ -47,6 +49,7 @@ export interface LeaderboardEntry {
   totalDistance: number; // in km or miles
   totalParticipantsInRides: number;
   score?: number; // A composite score if needed
+  safety_rating?: number | null;
 }
 
 export interface SystemAlert {
