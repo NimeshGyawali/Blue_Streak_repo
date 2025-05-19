@@ -33,9 +33,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Forbidden: Administrator access required.' }, { status: 403 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const filter = searchParams.get('filter') || 'active'; // 'active' or 'all'
+
     const client = await pool.connect();
     try {
-      const query = `
+      let query = `
         SELECT 
           id::text, 
           type, 
@@ -48,7 +51,13 @@ export async function GET(request: NextRequest) {
           resolved_by_user_id::text,
           resolved_at
         FROM system_alerts
-        WHERE status != 'Dismissed' AND status != 'Resolved' -- Example: Fetch active alerts
+      `;
+      
+      if (filter === 'active') {
+        query += ` WHERE status NOT IN ('Resolved', 'Dismissed')`;
+      }
+
+      query += `
         ORDER BY 
             CASE severity
                 WHEN 'Critical' THEN 1
@@ -86,4 +95,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// TODO: Implement POST for creating alerts (if needed via API), PATCH for updating alert status (e.g., dismiss, resolve)
+// TODO: Implement POST for creating alerts (if needed via API)
