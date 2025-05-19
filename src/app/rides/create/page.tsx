@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,11 +13,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, PlusCircle } from "lucide-react"
-import { format } from "date-fns"
+import { format, isValid } from "date-fns"
 import { cn } from "@/lib/utils"
 import { PageTitle } from '@/components/ui/PageTitle';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-const createRideSchema = z.object({
+const createRideSchemaClient = z.object({
   name: z.string().min(5, { message: 'Ride name must be at least 5 characters.' }).max(100),
   startPoint: z.string().min(3, { message: 'Start point is required.' }),
   endPoint: z.string().min(3, { message: 'End point is required (can be same as start for round trips).' }),
@@ -24,28 +27,84 @@ const createRideSchema = z.object({
     required_error: "Ride date and time is required.",
   }),
   description: z.string().max(500, { message: 'Description must be 500 characters or less.' }).optional(),
+  // mapLink: z.string().url({ message: "Please enter a valid URL for the map link."}).optional().or(z.literal('')),
 });
+
+// Type for server-side payload
+type CreateRidePayload = {
+  name: string;
+  startPoint: string;
+  endPoint: string;
+  dateTime: string; // ISO string
+  description?: string;
+  // mapLink?: string;
+};
+
 
 export default function CreateRidePage() {
   const { toast } = useToast();
-  const form = useForm<z.infer<typeof createRideSchema>>({
-    resolver: zodResolver(createRideSchema),
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const form = useForm<z.infer<typeof createRideSchemaClient>>({
+    resolver: zodResolver(createRideSchemaClient),
     defaultValues: {
       name: '',
       startPoint: '',
       endPoint: '',
       description: '',
+      // mapLink: '',
     },
   });
 
-  function onSubmit(values: z.infer<typeof createRideSchema>) {
-    console.log('Creating Micro-Ride:', values);
-    // In a real app, you'd send this data to your backend API
-    toast({
-      title: 'Micro-Ride Proposed!',
-      description: `Your ride "${values.name}" has been submitted. It will be auto-approved and listed shortly.`,
-    });
-    form.reset();
+  async function onSubmit(values: z.infer<typeof createRideSchemaClient>) {
+    setIsLoading(true);
+
+    const payload: CreateRidePayload = {
+      ...values,
+      dateTime: values.dateTime.toISOString(), // Convert Date object to ISO string for API
+    };
+
+    try {
+      // TODO: Add authorization header if your API requires it
+      // const token = getAuthToken(); // Your function to get token
+      // const headers = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+      const response = await fetch('/api/rides', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: 'Micro-Ride Created!',
+          description: result.message || `Your ride "${values.name}" has been created and listed.`,
+        });
+        form.reset();
+        // Optionally, redirect to the new ride's page or the main rides list
+        // router.push(result.ride ? `/rides/${result.ride.id}` : '/rides');
+        router.push('/rides');
+      } else {
+         toast({
+          variant: 'destructive',
+          title: 'Failed to Create Ride',
+          description: result.message || 'An unexpected error occurred. Please try again.',
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network Error',
+        description: 'Could not connect to the server. Please try again later.',
+      });
+      console.error("Create ride error:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -66,7 +125,7 @@ export default function CreateRidePage() {
                   <FormItem>
                     <FormLabel>Ride Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Sunday Morning Coffee Run" {...field} />
+                      <Input placeholder="e.g., Sunday Morning Coffee Run" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -79,7 +138,7 @@ export default function CreateRidePage() {
                   <FormItem>
                     <FormLabel>Start Point</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Main Street Cafe or specific address" {...field} />
+                      <Input placeholder="e.g., Main Street Cafe or specific address" {...field} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -92,7 +151,7 @@ export default function CreateRidePage() {
                   <FormItem>
                     <FormLabel>End Point / General Area</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Scenic Viewpoint Park or same as start" {...field} />
+                      <Input placeholder="e.g., Scenic Viewpoint Park or same as start" {...field} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -113,10 +172,11 @@ export default function CreateRidePage() {
                               "w-full justify-start text-left font-normal",
                               !field.value && "text-muted-foreground"
                             )}
+                            disabled={isLoading}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? (
-                              format(field.value, "PPP HH:mm") // Includes time, manual time input needed or use a date-time picker
+                            {field.value && isValid(field.value) ? (
+                              format(field.value, "PPP HH:mm")
                             ) : (
                               <span>Pick a date and time</span>
                             )}
@@ -133,17 +193,19 @@ export default function CreateRidePage() {
                           }
                           initialFocus
                         />
-                        {/* Basic Time Input - consider a dedicated time picker component for better UX */}
                         <div className="p-2 border-t">
                            <Input 
                             type="time"
-                            defaultValue={field.value ? format(field.value, "HH:mm") : undefined}
+                            defaultValue={field.value && isValid(field.value) ? format(field.value, "HH:mm") : undefined}
                             onChange={(e) => {
                               const [hours, minutes] = e.target.value.split(':').map(Number);
-                              const newDate = field.value ? new Date(field.value) : new Date();
-                              newDate.setHours(hours, minutes);
-                              field.onChange(newDate);
+                              const newDate = field.value && isValid(field.value) ? new Date(field.value) : new Date();
+                              if (!isNaN(hours) && !isNaN(minutes)) {
+                                newDate.setHours(hours, minutes);
+                                field.onChange(newDate);
+                              }
                             }}
+                            disabled={isLoading}
                            />
                         </div>
                       </PopoverContent>
@@ -162,16 +224,43 @@ export default function CreateRidePage() {
                   <FormItem>
                     <FormLabel>Short Description (Optional)</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="e.g., Quick ride for coffee and chat, all welcome!" {...field} />
+                      <Textarea placeholder="e.g., Quick ride for coffee and chat, all welcome!" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              {/* Optional: Map Link
+              <FormField
+                control={form.control}
+                name="mapLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Route Map Link (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., https://maps.google.com/..." {...field} disabled={isLoading} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              */}
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full">
-                <PlusCircle size={18} className="mr-2" /> Create Ride
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle size={18} className="mr-2" /> Create Ride
+                  </>
+                )}
               </Button>
             </CardFooter>
           </form>
