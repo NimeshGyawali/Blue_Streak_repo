@@ -10,24 +10,6 @@ import { pool } from '@/lib/db';
 async function checkAdminStatus(request: NextRequest): Promise<boolean> {
   // Placeholder: In a real app, you would validate a token/session
   // and check the user's roles in the database.
-  // const token = request.headers.get('Authorization')?.split(' ')[1];
-  // if (!token) return false;
-  // try {
-  //   const decoded = verifyToken(token); // Your JWT verification function
-  //   const client = await pool.connect();
-  //   try {
-  //     const userResult = await client.query('SELECT is_admin FROM users WHERE id = $1', [decoded.userId]);
-  //     if (userResult.rows.length > 0 && userResult.rows[0].is_admin) {
-  //       return true;
-  //     }
-  //     return false;
-  //   } finally {
-  //     client.release();
-  //   }
-  // } catch (error) {
-  //   console.error("Admin check error:", error);
-  //   return false;
-  // }
   console.warn("SECURITY WARNING: Admin check in /api/admin/users/[userId]/verify/route.ts PATCH is a placeholder and always returns true. IMPLEMENT REAL ADMIN AUTHENTICATION.");
   return true; // Placeholder: REMOVE THIS AND IMPLEMENT REAL LOGIC
 }
@@ -67,10 +49,18 @@ export async function PATCH(
         return NextResponse.json({ message: 'User is already verified.' }, { status: 400 });
       }
       
-      await client.query('UPDATE users SET is_verified = $1, updated_at = NOW() WHERE id = $2', [true, userId]);
+      const updateResult = await client.query(
+        `UPDATE users 
+         SET is_verified = $1, updated_at = NOW() 
+         WHERE id = $2
+         RETURNING id, name, email, city, bike_model, vin, is_verified, is_captain, is_admin, avatar_url, created_at`, 
+        [true, userId]
+      );
       
-      const updatedUserResult = await client.query('SELECT id, name, email, is_verified FROM users WHERE id = $1', [userId]);
-      const updatedUser = updatedUserResult.rows[0];
+      const updatedUser = {
+        ...updateResult.rows[0],
+        id: String(updateResult.rows[0].id)
+      };
 
       return NextResponse.json({ message: 'User verified successfully!', user: updatedUser }, { status: 200 });
 

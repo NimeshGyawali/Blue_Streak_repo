@@ -62,11 +62,20 @@ export async function PATCH(
       // Update ride status to 'Rejected'
       // You might also want to store the rejection reason if you implement that
       const updateResult = await client.query(
-        "UPDATE rides SET status = 'Rejected', updated_at = NOW() WHERE id = $1 RETURNING id, name, status", // Add , rejection_reason = $2 if storing reason
+        `UPDATE rides 
+         SET status = 'Rejected', updated_at = NOW() 
+         WHERE id = $1 
+         RETURNING id, name, type, description, route_start, route_end, route_map_link, date_time, captain_id, status, thumbnail_url, photo_hints`, // Add , rejection_reason = $2 if storing reason
         [rideId] // Add , reason if storing reason
       );
+      
+      const rejectedRide = {
+        ...updateResult.rows[0],
+        id: String(updateResult.rows[0].id),
+        captain_id: String(updateResult.rows[0].captain_id)
+      };
 
-      return NextResponse.json({ message: 'Ride rejected successfully!', ride: updateResult.rows[0] }, { status: 200 });
+      return NextResponse.json({ message: 'Ride rejected successfully!', ride: rejectedRide }, { status: 200 });
 
     } catch (dbError) {
       console.error('Reject Ride DB error:', dbError);

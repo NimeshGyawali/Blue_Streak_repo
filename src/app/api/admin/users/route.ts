@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     const client = await pool.connect();
     try {
       const result = await client.query(
-        'SELECT id, name, email, city, bike_model, vin, is_verified, is_captain, is_admin, created_at FROM users ORDER BY created_at DESC'
+        'SELECT id, name, email, city, bike_model, vin, is_verified, is_captain, is_admin, avatar_url, created_at FROM users ORDER BY created_at DESC'
       );
       
       const users = result.rows.map(user => ({
@@ -67,3 +67,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'An unexpected error occurred.' }, { status: 500 });
   }
 }
+

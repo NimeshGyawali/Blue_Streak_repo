@@ -21,6 +21,7 @@ const createRideSchema = z.object({
   endPoint: z.string().min(3, "End point is required."),
   dateTime: z.string().datetime({ message: "Invalid date and time format." }),
   description: z.string().max(500, "Description must be 500 characters or less.").optional(),
+  // mapLink: z.string().url().optional().or(z.literal('')), // from schema.sql, route_map_link is TEXT nullable
 });
 
 export async function POST(request: NextRequest) {
@@ -37,22 +38,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid input.', errors: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const { name, startPoint, endPoint, dateTime, description } = validation.data;
+    const { name, startPoint, endPoint, dateTime, description /*, mapLink*/ } = validation.data;
 
     const client = await pool.connect();
     try {
       const rideType = 'Micro';
       const rideStatus = 'Upcoming'; // Micro-Rides are auto-approved
+      const defaultThumbnailUrl = `https://placehold.co/600x400.png`;
+      const defaultPhotoHints = 'motorcycle ride';
+      // const rideMapLink = mapLink || null; // Set to null if empty or not provided
 
       const result = await client.query(
-        `INSERT INTO rides (name, type, description, route_start, route_end, date_time, captain_id, status, created_at, updated_at, thumbnail_url, photo_hints)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW(), $9, $10)
-         RETURNING id, name, type, description, route_start, route_end, date_time, captain_id, status, thumbnail_url, photo_hints`,
-        [name, rideType, description || '', startPoint, endPoint, new Date(dateTime), captainId, rideStatus, `https://placehold.co/600x400.png`, 'motorcycle ride']
+        `INSERT INTO rides (name, type, description, route_start, route_end, route_map_link, date_time, captain_id, status, created_at, updated_at, thumbnail_url, photo_hints)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW(), $10, $11)
+         RETURNING id, name, type, description, route_start, route_end, route_map_link, date_time, captain_id, status, thumbnail_url, photo_hints`,
+        [name, rideType, description || '', startPoint, endPoint, null /*rideMapLink*/, new Date(dateTime), captainId, rideStatus, defaultThumbnailUrl, defaultPhotoHints]
       );
 
       const newRide = result.rows[0];
-      const responseRide: Ride = {
+      const responseRide: Partial<Ride> = { // Return Partial<Ride> as captain/participants aren't fully resolved here
         id: String(newRide.id),
         name: newRide.name,
         type: newRide.type as Ride['type'],
@@ -60,6 +64,7 @@ export async function POST(request: NextRequest) {
         route: {
           start: newRide.route_start,
           end: newRide.route_end,
+          mapLink: newRide.route_map_link,
         },
         dateTime: new Date(newRide.date_time),
         captain: { id: String(newRide.captain_id), name: 'Fetching Captain...' }, // Captain details would need another query or be passed
@@ -139,6 +144,7 @@ export async function GET(request: NextRequest) {
         status: row.status as Ride['status'],
         thumbnailUrl: row.thumbnail_url,
         photoHints: row.photo_hints,
+        photos: [] // Photos are fetched in detail view
       }));
       
       return NextResponse.json(rides, { status: 200 });

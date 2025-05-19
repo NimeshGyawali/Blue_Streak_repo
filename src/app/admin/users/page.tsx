@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { CheckCircle, XCircle, UserCheck, Hourglass, ShieldAlert, ShieldCheck as AdminIcon } from 'lucide-react';
+import { CheckCircle, UserCheck, Hourglass, ShieldAlert, ShieldCheck as AdminIcon } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from 'next/navigation';
 
 interface AdminUser {
@@ -21,7 +22,8 @@ interface AdminUser {
   vin: string | null;
   is_verified: boolean;
   is_captain: boolean;
-  is_admin: boolean; // Added is_admin
+  is_admin: boolean;
+  avatar_url: string | null;
   created_at: string;
 }
 
@@ -94,15 +96,17 @@ export default function UserManagementPage() {
         throw new Error(errorData.message || `Failed to verify user ${userId}.`);
       }
 
-      const updatedUser = await response.json();
+      const result = await response.json();
+      const updatedUserFromApi: AdminUser = result.user;
+      
       setUsers((prevUsers) =>
         prevUsers.map((user) =>
-          user.id === userId ? { ...user, is_verified: updatedUser.user.is_verified } : user
+          user.id === userId ? updatedUserFromApi : user
         )
       );
       toast({
         title: 'User Verified',
-        description: `User ${updatedUser.user.name} has been successfully verified.`,
+        description: `User ${updatedUserFromApi.name} has been successfully verified.`,
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -160,6 +164,7 @@ export default function UserManagementPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12 hidden sm:table-cell">Avatar</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead className="hidden md:table-cell">City</TableHead>
@@ -173,6 +178,12 @@ export default function UserManagementPage() {
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.id}>
+                    <TableCell className="hidden sm:table-cell">
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage src={user.avatar_url || `https://placehold.co/40x40.png`} alt={user.name} data-ai-hint="person avatar" />
+                        <AvatarFallback>{user.name?.charAt(0)?.toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                    </TableCell>
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell className="hidden md:table-cell">{user.city || 'N/A'}</TableCell>
@@ -229,3 +240,4 @@ export default function UserManagementPage() {
     </div>
   );
 }
+

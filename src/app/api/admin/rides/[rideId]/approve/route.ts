@@ -48,13 +48,22 @@ export async function PATCH(
       }
 
       // Update ride status to 'Upcoming' (or 'Approved', depending on your desired workflow)
-      // For simplicity, we'll use 'Upcoming' as an approved state ready for users.
       const updateResult = await client.query(
-        "UPDATE rides SET status = 'Upcoming', updated_at = NOW() WHERE id = $1 RETURNING id, name, status",
+        `UPDATE rides 
+         SET status = 'Upcoming', updated_at = NOW() 
+         WHERE id = $1 
+         RETURNING id, name, type, description, route_start, route_end, route_map_link, date_time, captain_id, status, thumbnail_url, photo_hints`,
         [rideId]
       );
 
-      return NextResponse.json({ message: 'Ride approved successfully!', ride: updateResult.rows[0] }, { status: 200 });
+      const approvedRide = {
+        ...updateResult.rows[0],
+        id: String(updateResult.rows[0].id),
+        captain_id: String(updateResult.rows[0].captain_id) // Ensure captain_id is string if type expects
+      };
+
+
+      return NextResponse.json({ message: 'Ride approved successfully!', ride: approvedRide }, { status: 200 });
 
     } catch (dbError) {
       console.error('Approve Ride DB error:', dbError);
