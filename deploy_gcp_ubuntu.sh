@@ -25,6 +25,7 @@ APP_NAME="yamaha-blue-streaks" # Used for PM2 and Nginx config names
 DB_NAME="yamaha_blue_streaks_db"
 DB_USER="yamaha_app_user"
 # DB_PASSWORD will be prompted
+VM_IP_OR_DOMAIN="" # Will be prompted
 
 # --- Helper Functions ---
 print_success() {
@@ -49,6 +50,16 @@ print_info() {
 set -e
 
 print_info "Starting deployment for $APP_NAME..."
+
+# Prompt for VM IP or Domain early
+print_info "We need your VM's public IP address or domain name for configuration."
+read -p "Enter your VM's public IP address or domain name (e.g., 34.123.45.67 or myapp.example.com): " VM_IP_OR_DOMAIN
+if [ -z "$VM_IP_OR_DOMAIN" ]; then
+  print_error "VM IP address or domain name cannot be empty. Exiting."
+  exit 1
+fi
+print_info "Using '$VM_IP_OR_DOMAIN' for configurations."
+
 
 # 1. System Update and Essential Packages
 print_info "Updating system packages and installing essentials..."
@@ -101,17 +112,16 @@ if [ -f ".env.local" ]; then
   print_warning ".env.local file already exists. Please ensure it's correctly configured."
   print_warning "Ensure DATABASE_URL is: postgresql://$DB_USER:YOUR_CHOSEN_PASSWORD@localhost:5432/$DB_NAME?sslmode=disable"
   print_warning "Ensure JWT_SECRET is set to a strong, unique value."
-  print_warning "Ensure NEXT_PUBLIC_BASE_URL is set to your VM's IP or domain."
+  print_warning "Ensure NEXT_PUBLIC_BASE_URL is set to your VM's IP or domain: $VM_IP_OR_DOMAIN"
 else
   touch .env.local
   echo "DATABASE_URL=\"postgresql://$DB_USER:$DB_PASSWORD@localhost:5432/$DB_NAME?sslmode=disable\"" >> .env.local
   JWT_SECRET_VALUE=$(openssl rand -hex 32)
   echo "JWT_SECRET=\"$JWT_SECRET_VALUE\"" >> .env.local
-  echo "NEXT_PUBLIC_BASE_URL=\"http://YOUR_VM_IP_OR_DOMAIN\"" >> .env.local # Replace with actual IP/domain
+  echo "NEXT_PUBLIC_BASE_URL=\"http://$VM_IP_OR_DOMAIN\"" >> .env.local
   echo "NODE_ENV=\"production\"" >> .env.local
 
-  print_success ".env.local file created with database connection string and JWT_SECRET."
-  print_warning "IMPORTANT: You MUST edit .env.local and replace YOUR_VM_IP_OR_DOMAIN with your VM's actual public IP address or configured domain name for NEXT_PUBLIC_BASE_URL."
+  print_success ".env.local file created with database connection string, JWT_SECRET, and NEXT_PUBLIC_BASE_URL set to 'http://$VM_IP_OR_DOMAIN'."
   print_warning "Review and adjust other variables in .env.local as needed."
 fi
 
@@ -139,8 +149,7 @@ server {
     listen 80;
     listen [::]:80;
 
-    # Replace with your server's IP address or domain name
-    server_name YOUR_VM_IP_OR_DOMAIN_HERE _; # The underscore makes it the default server
+    server_name $VM_IP_OR_DOMAIN _; # The underscore makes it the default server for this IP/port
 
     # Logging
     access_log /var/log/nginx/$APP_NAME.access.log;
@@ -196,8 +205,8 @@ sudo nginx -t
 print_info "Restarting Nginx..."
 sudo systemctl restart nginx
 sudo systemctl enable nginx # Ensure Nginx starts on boot
-print_success "Nginx installed and configured."
-print_warning "IMPORTANT: You MUST edit $NGINX_CONF_FILE and replace YOUR_VM_IP_OR_DOMAIN_HERE with your VM's actual public IP address or configured domain name. Then run 'sudo nginx -t && sudo systemctl restart nginx'."
+print_success "Nginx installed and configured with server_name set to '$VM_IP_OR_DOMAIN'."
+print_warning "If '$VM_IP_OR_DOMAIN' was an IP address, ensure your DNS records are set up if you plan to use a domain name later."
 
 # 10. Configure Firewall (UFW)
 print_info "Configuring UFW firewall..."
@@ -248,12 +257,14 @@ print_info "You can monitor the app with 'pm2 monit' or 'pm2 logs $APP_NAME'."
 # --- Final Instructions ---
 echo ""
 print_success "--- DEPLOYMENT SCRIPT COMPLETED ---"
-print_info "Your application should now be accessible via Nginx at http://YOUR_VM_IP_OR_DOMAIN (after Nginx config update)."
+print_info "Your application should now be accessible via Nginx at http://$VM_IP_OR_DOMAIN."
 print_warning "ACTION REQUIRED:"
-print_warning "1. Edit /etc/nginx/sites-available/$APP_NAME and set the correct 'server_name' (replace YOUR_VM_IP_OR_DOMAIN_HERE). Then run 'sudo nginx -t && sudo systemctl restart nginx'."
-print_warning "2. Edit $APP_DIR/.env.local and set NEXT_PUBLIC_BASE_URL to your VM's public IP or domain. Then restart the app with 'pm2 restart $APP_NAME'."
-print_warning "3. If prompted, run the 'sudo ... pm2 startup ...' command printed during the PM2 setup to enable startup on boot, then run 'pm2 save'."
+print_warning "1. If the auto-config for Nginx or .env.local was not sufficient, double-check:"
+print_warning "   - /etc/nginx/sites-available/$APP_NAME (server_name should be '$VM_IP_OR_DOMAIN'). If changed, run 'sudo nginx -t && sudo systemctl restart nginx'."
+print_warning "   - $APP_DIR/.env.local (NEXT_PUBLIC_BASE_URL should be 'http://$VM_IP_OR_DOMAIN'). If changed, restart app with 'pm2 restart $APP_NAME'."
+print_warning "2. If prompted, run the 'sudo ... pm2 startup ...' command printed during the PM2 setup to enable startup on boot, then run 'pm2 save'."
 print_info "To check PM2 status: pm2 list"
 print_info "To view logs: pm2 logs $APP_NAME"
 print_info "To stop the app: pm2 stop $APP_NAME"
 print_info "To restart the app: pm2 restart $APP_NAME"
+
