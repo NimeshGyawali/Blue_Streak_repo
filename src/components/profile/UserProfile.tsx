@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { User, Ride } from '@/types';
@@ -6,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Award, Bike, CalendarDays, Edit3, MapPin, ShieldCheck, Star, Navigation } from 'lucide-react';
+import { Award, Bike, CalendarDays, Edit3, MapPin, ShieldCheck, Star, Navigation, Hourglass, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { Skeleton } from '../ui/skeleton';
 
 interface Achievement {
   id: string;
@@ -22,9 +24,17 @@ interface UserProfileProps {
   user: User;
   rideHistory: Ride[];
   achievements: Achievement[];
+  isLoadingRideHistory?: boolean;
+  rideHistoryError?: string | null;
 }
 
-export function UserProfile({ user, rideHistory, achievements }: UserProfileProps) {
+export function UserProfile({ 
+  user, 
+  rideHistory, 
+  achievements,
+  isLoadingRideHistory,
+  rideHistoryError 
+}: UserProfileProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Profile Card */}
@@ -37,6 +47,7 @@ export function UserProfile({ user, rideHistory, achievements }: UserProfileProp
           <CardTitle className="text-2xl">{user.name}</CardTitle>
           <CardDescription>{user.email}</CardDescription>
           {user.isCaptain && <Badge variant="default" className="mt-2"><ShieldCheck size={14} className="mr-1" /> Certified Captain</Badge>}
+           {user.is_admin && <Badge variant="destructive" className="mt-2"><ShieldCheck size={14} className="mr-1" /> Administrator</Badge>}
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center text-sm">
@@ -64,18 +75,36 @@ export function UserProfile({ user, rideHistory, achievements }: UserProfileProp
             <CardDescription>Your past adventures on Yamaha Blue Streaks.</CardDescription>
           </CardHeader>
           <CardContent>
-            {rideHistory.length === 0 ? (
-              <p className="text-muted-foreground">No rides completed yet. <Link href="/rides" className="text-primary hover:underline">Find a ride!</Link></p>
-            ) : (
+            {isLoadingRideHistory && (
+              <div className="space-y-4">
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+              </div>
+            )}
+            {!isLoadingRideHistory && rideHistoryError && (
+              <div className="text-center p-4 border border-destructive bg-destructive/10 rounded-md">
+                <ShieldAlert className="mx-auto h-8 w-8 text-destructive mb-2" />
+                <p className="text-sm font-medium text-destructive">Could not load ride history</p>
+                <p className="text-xs text-muted-foreground">{rideHistoryError}</p>
+              </div>
+            )}
+            {!isLoadingRideHistory && !rideHistoryError && rideHistory.length === 0 && (
+              <p className="text-muted-foreground text-center py-4">No rides completed or joined yet. <Link href="/rides" className="text-primary hover:underline">Find a ride!</Link></p>
+            )}
+            {!isLoadingRideHistory && !rideHistoryError && rideHistory.length > 0 && (
               <ul className="space-y-4 max-h-96 overflow-y-auto pr-2">
                 {rideHistory.map((ride) => (
-                  <li key={ride.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <li key={ride.id} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                     <div className="flex justify-between items-start">
                       <div>
                         <Link href={`/rides/${ride.id}`} className="font-semibold text-primary hover:underline">{ride.name}</Link>
                         <p className="text-xs text-muted-foreground">{ride.type} Ride</p>
                       </div>
-                      <Badge variant="outline">{ride.status}</Badge>
+                      <Badge variant={ride.status === "Completed" ? "default" : "outline"} 
+                             className={ride.status === "Completed" ? "bg-green-500 hover:bg-green-600" : ""}>
+                        {ride.status}
+                      </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                       <CalendarDays size={12} /> {format(new Date(ride.dateTime), 'MMM dd, yyyy')}
@@ -93,8 +122,9 @@ export function UserProfile({ user, rideHistory, achievements }: UserProfileProp
             <CardDescription>Milestones you've reached in the community.</CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Achievements are still using mock data */}
             {achievements.length === 0 ? (
-              <p className="text-muted-foreground">No achievements unlocked yet. Keep riding!</p>
+              <p className="text-muted-foreground text-center py-4">No achievements unlocked yet. Keep riding!</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {achievements.map((ach) => (
