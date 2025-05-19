@@ -3,18 +3,19 @@
 
 import { useEffect, useState } from 'react';
 import { UserProfile } from '@/components/profile/UserProfile';
-import type { User, Ride, Achievement } from '@/types'; // Import Achievement type
+import type { User, Ride, Achievement } from '@/types';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ShieldAlert, UserCircle, Navigation, Award } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+
 
 function ProfileSkeleton() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Profile Card Skeleton */}
       <div className="lg:col-span-1 p-6 border rounded-lg shadow-lg space-y-4">
         <Skeleton className="w-24 h-24 rounded-full mx-auto" />
         <Skeleton className="h-6 w-3/4 mx-auto" />
@@ -25,12 +26,11 @@ function ProfileSkeleton() {
         <Skeleton className="h-8 w-full" />
         <Skeleton className="h-10 w-full mt-2" />
       </div>
-      {/* Ride History & Achievements Skeletons */}
       <div className="lg:col-span-2 space-y-8">
         <div className="p-6 border rounded-lg shadow-lg">
           <div className="flex items-center gap-2 mb-4">
             <Navigation size={22} className="text-primary" />
-            <Skeleton className="h-6 w-1/3" /> {/* Title Skeleton */}
+            <Skeleton className="h-6 w-1/3" />
           </div>
           <Skeleton className="h-10 w-full mb-2" />
           <Skeleton className="h-10 w-full mb-2" />
@@ -39,7 +39,7 @@ function ProfileSkeleton() {
         <div className="p-6 border rounded-lg shadow-lg">
            <div className="flex items-center gap-2 mb-4">
             <Award size={22} className="text-primary" />
-            <Skeleton className="h-6 w-1/3" /> {/* Title Skeleton */}
+            <Skeleton className="h-6 w-1/3" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Skeleton className="h-20 w-full" />
@@ -53,7 +53,7 @@ function ProfileSkeleton() {
 
 
 export default function ProfilePage() {
-  const { user: authUser, token, isLoading: authLoading } = useAuth();
+  const { token, isLoading: authLoading, user: authContextUser } = useAuth();
   const [profileData, setProfileData] = useState<User | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -67,9 +67,10 @@ export default function ProfilePage() {
   const [achievementsError, setAchievementsError] = useState<string | null>(null);
 
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
-    async function fetchAllProfileData() {
+    async function fetchProfilePageData() {
       if (authLoading) return; 
 
       if (!token) {
@@ -79,10 +80,10 @@ export default function ProfilePage() {
         setIsLoadingProfile(false);
         setIsLoadingRideHistory(false);
         setIsLoadingAchievements(false);
+        router.push('/auth/login?redirect=/profile'); // Redirect to login if no token
         return;
       }
 
-      // Reset errors
       setProfileError(null);
       setRideHistoryError(null);
       setAchievementsError(null);
@@ -122,7 +123,7 @@ export default function ProfilePage() {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error fetching ride history.';
         setRideHistoryError(errorMessage);
-        toast({ variant: 'destructive', title: 'Error Fetching Ride History', description: errorMessage });
+        // toast({ variant: 'destructive', title: 'Error Fetching Ride History', description: errorMessage }); // Can be noisy, profile component handles its error display
       } finally {
         setIsLoadingRideHistory(false);
       }
@@ -142,14 +143,22 @@ export default function ProfilePage() {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error fetching achievements.';
         setAchievementsError(errorMessage);
-        toast({ variant: 'destructive', title: 'Error Fetching Achievements', description: errorMessage });
+        // toast({ variant: 'destructive', title: 'Error Fetching Achievements', description: errorMessage }); // Can be noisy
       } finally {
         setIsLoadingAchievements(false);
       }
     }
 
-    fetchAllProfileData();
-  }, [token, toast, authLoading]);
+    fetchProfilePageData();
+  }, [token, toast, authLoading, router]);
+  
+  // Update profileData if authContextUser changes (e.g., after a successful profile edit via UserProfile component)
+  useEffect(() => {
+    if (authContextUser) {
+      setProfileData(authContextUser);
+    }
+  }, [authContextUser]);
+
 
   if (authLoading || isLoadingProfile) {
     return (
@@ -168,8 +177,8 @@ export default function ProfilePage() {
             <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-destructive mb-2">Could not load profile</h2>
             <p className="text-muted-foreground mb-4">{profileError || "An unexpected issue occurred."}</p>
-            {!token && (
-                <Button onClick={() => window.location.href = '/auth/login'}>Login</Button>
+            {!token && ( // This condition might be redundant if router.push above works fast enough
+                <Button onClick={() => router.push('/auth/login')}>Login</Button>
             )}
         </div>
       </div>

@@ -7,36 +7,40 @@ import { useRouter } from 'next/navigation';
 
 interface AuthState {
   user: User | null;
+  token: string | null;
   isLoading: boolean;
   login: (userData: User, token?: string) => void;
   logout: () => void;
-  checkAuth: () => void; // Function to check auth status on load
+  checkAuth: () => void; 
+  updateUser: (updatedUserData: Partial<User>) => void; // Function to update user in context
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start as true until first check
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true); 
   const router = useRouter();
 
-  // Function to check auth status from localStorage (or other storage)
   const checkAuth = () => {
     setIsLoading(true);
     try {
       const storedUser = localStorage.getItem('currentUser');
-      const storedToken = localStorage.getItem('authToken'); // Example: if you store a token
+      const storedToken = localStorage.getItem('authToken');
 
       if (storedUser && storedToken) {
         const parsedUser: User = JSON.parse(storedUser);
         setUser(parsedUser);
-        // TODO: Optionally validate token with backend here
+        setToken(storedToken);
       } else {
-        setUser(null); // Ensure user is null if no stored data
+        setUser(null);
+        setToken(null);
       }
     } catch (error) {
       console.error("Error reading auth state from storage:", error);
       setUser(null);
+      setToken(null);
       localStorage.removeItem('currentUser');
       localStorage.removeItem('authToken');
     } finally {
@@ -49,27 +53,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
 
-  const login = (userData: User, token?: string) => {
+  const login = (userData: User, jwtToken?: string) => {
     setUser(userData);
     localStorage.setItem('currentUser', JSON.stringify(userData));
-    if (token) {
-      localStorage.setItem('authToken', token); // Example: store token
+    if (jwtToken) {
+      setToken(jwtToken);
+      localStorage.setItem('authToken', jwtToken); 
     }
     setIsLoading(false);
   };
 
   const logout = () => {
     setUser(null);
+    setToken(null);
     localStorage.removeItem('currentUser');
-    localStorage.removeItem('authToken'); // Example: remove token
-    // Optionally redirect to login or home page
+    localStorage.removeItem('authToken'); 
     router.push('/auth/login');
-    router.refresh(); // To ensure server components might re-evaluate if needed
+    router.refresh(); 
     setIsLoading(false);
   };
 
+  const updateUser = (updatedUserData: Partial<User>) => {
+    if (user) {
+      const newUser = { ...user, ...updatedUserData };
+      setUser(newUser);
+      localStorage.setItem('currentUser', JSON.stringify(newUser));
+      // Token typically doesn't change on profile update unless reissued by backend
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, checkAuth, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
