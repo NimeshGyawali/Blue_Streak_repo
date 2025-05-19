@@ -1,11 +1,51 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
+import { JWT_SECRET } from '../../../../../lib/authConstants'; // Corrected relative path
+import jwt from 'jsonwebtoken';
 // import { pool } from '@/lib/db'; // For when you connect to the DB
 
+interface DecodedToken {
+  userId: string;
+  isAdmin: boolean;
+  iat: number;
+}
+
+interface AdminAuthResult {
+  isAdmin: boolean;
+  userId?: string;
+  error?: string;
+  status?: number;
+}
+
+
 // TODO: Replace this with your actual admin authentication logic
-async function checkAdminStatus(request: NextRequest): Promise<boolean> {
-  console.warn("SECURITY WARNING: Admin check in /api/admin/dashboard/chapter-activity GET is a placeholder. IMPLEMENT REAL ADMIN AUTHENTICATION.");
-  return true; // REMOVE THIS AND IMPLEMENT REAL LOGIC
+async function checkAdminStatus(request: NextRequest): Promise<AdminAuthResult> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { isAdmin: false, error: 'Authorization header missing or malformed.', status: 401 };
+  }
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return { isAdmin: false, error: 'Token not found.', status: 401 };
+  }
+
+  try {
+    if (!JWT_SECRET) {
+      console.error('JWT_SECRET is not defined. Cannot verify token.');
+      return { isAdmin: false, error: 'JWT secret not configured on server.', status: 500 };
+    }
+    const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+    if (!decoded.isAdmin) {
+      return { isAdmin: false, error: 'Forbidden: Administrator access required.', status: 403 };
+    }
+    return { isAdmin: true, userId: decoded.userId };
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return { isAdmin: false, error: `Invalid token: ${error.message}`, status: 401 };
+    }
+    console.error('Admin check error:', error);
+    return { isAdmin: false, error: 'Internal server error during token validation.', status: 500 };
+  }
 }
 
 interface ChapterActivity {
@@ -19,11 +59,10 @@ interface ChapterActivity {
 const MIN_MONTHLY_RIDES_THRESHOLD = 2; // Define threshold here or fetch from config
 
 export async function GET(request: NextRequest) {
-  try {
-    const isAdmin = await checkAdminStatus(request);
-    if (!isAdmin) {
-      return NextResponse.json({ message: 'Forbidden: Administrator access required.' }, { status: 403 });
-    }
+  const adminAuth = await checkAdminStatus(request);
+  if (!adminAuth.isAdmin) {
+    return NextResponse.json({ message: adminAuth.error || 'Forbidden: Administrator access required.' }, { status: adminAuth.status || 403 });
+  }
 
     // TODO: Replace with actual database queries
     // You'll need to:
@@ -39,9 +78,4 @@ export async function GET(request: NextRequest) {
     ];
 
     return NextResponse.json(mockChapterActivity, { status: 200 });
-
-  } catch (error) {
-    console.error('Get Chapter Activity API error:', error);
-    return NextResponse.json({ message: 'An unexpected error occurred fetching chapter activity.' }, { status: 500 });
-  }
 }
