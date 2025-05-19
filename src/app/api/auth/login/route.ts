@@ -1,14 +1,12 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-// TODO: Import your PostgreSQL client (e.g., 'pg') and database connection setup
-// import { pool } from '@/lib/db'; // Example path to your DB setup
-// TODO: Import a password hashing library (e.g., 'bcryptjs')
-// import bcrypt from 'bcryptjs';
+import { pool } from '@/lib/db';
+import bcrypt from 'bcryptjs';
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email("Invalid email address."),
+  password: z.string().min(1, "Password is required."),
 });
 
 export async function POST(request: NextRequest) {
@@ -17,50 +15,57 @@ export async function POST(request: NextRequest) {
     const validation = loginSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json({ message: 'Invalid input.', errors: validation.error.errors }, { status: 400 });
+      return NextResponse.json({ message: 'Invalid input.', errors: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
     const { email, password } = validation.data;
 
-    // --- TODO: PostgreSQL Logic ---
-    // 1. Connect to your PostgreSQL database
-    // const client = await pool.connect();
-    // try {
-    //   // 2. Find the user by email
-    //   const result = await client.query('SELECT id, name, email, password_hash, city, bike_model, vin, is_captain, avatar_url FROM users WHERE email = $1', [email]);
-    //   const user = result.rows[0];
-    //
-    //   if (!user) {
-    //     return NextResponse.json({ message: 'Invalid email or password.' }, { status: 401 });
-    //   }
-    //
-    //   // 3. Compare the provided password with the stored hashed password
-    //   // const passwordMatch = await bcrypt.compare(password, user.password_hash);
-    //   // if (!passwordMatch) {
-    //   //   return NextResponse.json({ message: 'Invalid email or password.' }, { status: 401 });
-    //   // }
-    //
-    //   // 4. If credentials are valid, generate a session/token (e.g., JWT)
-    //   //    and return user data (excluding password)
-    //   const { password_hash, ...userWithoutPassword } = user;
-    //   //   return NextResponse.json({ message: 'Login successful!', user: userWithoutPassword, token: 'YOUR_GENERATED_JWT_TOKEN' }, { status: 200 });
-    //
-    // } finally {
-    //   client.release();
-    // }
-    // --- End PostgreSQL Logic ---
+    const client = await pool.connect();
+    try {
+      // Find the user by email
+      const result = await client.query(
+        'SELECT id, name, email, password_hash, city, bike_model, vin, is_captain, is_verified, avatar_url FROM users WHERE email = $1', 
+        [email.toLowerCase()]
+      );
+      const user = result.rows[0];
 
-    // Placeholder response until DB logic is implemented
-    console.log('Login attempt:', { email, password });
-    // Simulate finding a user and successful login for now
-    if (email === "test@example.com" && password === "password") {
-        return NextResponse.json({ message: 'Login successful! (Mock Response)', user: { id: 'mockId', name: 'Mock User', email } }, { status: 200 });
-    } else {
-        return NextResponse.json({ message: 'Invalid email or password. (Mock Response)' }, { status: 401 });
+      if (!user) {
+        return NextResponse.json({ message: 'Invalid email or password.' }, { status: 401 });
+      }
+
+      // Compare the provided password with the stored hashed password
+      const passwordMatch = await bcrypt.compare(password, user.password_hash);
+      if (!passwordMatch) {
+        return NextResponse.json({ message: 'Invalid email or password.' }, { status: 401 });
+      }
+
+      // TODO: Check if user is_verified if you have such a policy for login
+      // if (!user.is_verified) {
+      //   return NextResponse.json({ message: 'Account not verified. Please check your email or contact support.' }, { status: 403 });
+      // }
+
+      // If credentials are valid, prepare user data (excluding password)
+      // TODO: Generate a session/token (e.g., JWT)
+      const { password_hash, ...userWithoutPassword } = user;
+      return NextResponse.json({ 
+        message: 'Login successful!', 
+        user: userWithoutPassword, 
+        // token: 'YOUR_GENERATED_JWT_TOKEN' // Placeholder for token
+      }, { status: 200 });
+
+    } catch (dbError) {
+      console.error('Login DB error:', dbError);
+      return NextResponse.json({ message: 'Database error during login.' }, { status: 500 });
+    }
+    finally {
+      client.release();
     }
 
   } catch (error) {
     console.error('Login API error:', error);
+     if (error instanceof z.ZodError) {
+        return NextResponse.json({ message: 'Validation error', errors: error.errors }, { status: 400 });
+    }
     return NextResponse.json({ message: 'An unexpected error occurred.' }, { status: 500 });
   }
 }

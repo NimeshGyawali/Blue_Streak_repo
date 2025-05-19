@@ -1,18 +1,16 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-// TODO: Import your PostgreSQL client (e.g., 'pg') and database connection setup
-// import { pool } from '@/lib/db'; // Example path to your DB setup
-// TODO: Import a password hashing library (e.g., 'bcryptjs')
-// import bcrypt from 'bcryptjs';
+import { pool } from '@/lib/db'; 
+import bcrypt from 'bcryptjs';
 
 const signupSchemaServer = z.object({
-  name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(6),
-  city: z.string().min(1),
-  bikeModel: z.string().min(1),
-  vin: z.string().min(17).max(17),
+  name: z.string().min(2, "Name must be at least 2 characters."),
+  email: z.string().email("Invalid email address."),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+  city: z.string().min(1, "City/Region is required."),
+  bikeModel: z.string().min(1, "Yamaha Bike Model is required."),
+  vin: z.string().min(17, "VIN must be 17 characters.").max(17, "VIN must be 17 characters."),
 });
 
 export async function POST(request: NextRequest) {
@@ -26,41 +24,48 @@ export async function POST(request: NextRequest) {
 
     const { name, email, password, city, bikeModel, vin } = validation.data;
 
-    // --- TODO: PostgreSQL Logic ---
-    // 1. Connect to your PostgreSQL database
-    // const client = await pool.connect();
-    // try {
-    //   // 2. Check if user already exists
-    //   const existingUser = await client.query('SELECT id FROM users WHERE email = $1', [email]);
-    //   if (existingUser.rows.length > 0) {
-    //     return NextResponse.json({ message: 'User with this email already exists.' }, { status: 409 });
-    //   }
-    //
-    //   // 3. Hash the password
-    //   // const hashedPassword = await bcrypt.hash(password, 10); // Adjust salt rounds as needed
-    //
-    //   // 4. Insert the new user into the database
-    //   // const newUserResult = await client.query(
-    //   //   'INSERT INTO users (name, email, password_hash, city, bike_model, vin, is_captain) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, email, city, bike_model, vin, is_captain, avatar_url',
-    //   //   [name, email, hashedPassword, city, bikeModel, vin, false] // Default is_captain to false
-    //   // );
-    //   // const newUser = newUserResult.rows[0];
-    //
-    //   // 5. Generate a session/token (e.g., JWT) and return user data
-    //   // return NextResponse.json({ message: 'Signup successful!', user: newUser, token: 'YOUR_GENERATED_JWT_TOKEN' }, { status: 201 });
-    //
-    // } finally {
-    //   client.release();
-    // }
-    // --- End PostgreSQL Logic ---
+    const client = await pool.connect();
+    try {
+      // Check if user already exists
+      const existingUserResult = await client.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+      if (existingUserResult.rows.length > 0) {
+        return NextResponse.json({ message: 'User with this email already exists.' }, { status: 409 });
+      }
 
-    // Placeholder response until DB logic is implemented
-    console.log('Signup attempt:', { name, email, password, city, bikeModel, vin });
-    // Simulate successful signup for now
-    return NextResponse.json({ message: 'Signup successful! (Mock Response)', user: { id: 'mockId', name, email } }, { status: 201 });
+      // Hash the password
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+      // Insert the new user into the database
+      // Default is_captain and is_verified to false
+      const newUserResult = await client.query(
+        `INSERT INTO users (name, email, password_hash, city, bike_model, vin, is_captain, is_verified, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) 
+         RETURNING id, name, email, city, bike_model, vin, is_captain, is_verified, avatar_url`,
+        [name, email.toLowerCase(), hashedPassword, city, bikeModel, vin, false, false]
+      );
+      const newUser = newUserResult.rows[0];
+
+      // TODO: Generate a session/token (e.g., JWT) and include it in the response
+      // For now, just returning the user
+      return NextResponse.json({ 
+        message: 'Signup successful!', 
+        user: newUser, 
+        // token: 'YOUR_GENERATED_JWT_TOKEN' // Placeholder for token
+      }, { status: 201 });
+
+    } catch (dbError) {
+      console.error('Signup DB error:', dbError);
+      return NextResponse.json({ message: 'Database error during signup.' }, { status: 500 });
+    } finally {
+      client.release();
+    }
 
   } catch (error) {
     console.error('Signup API error:', error);
+    if (error instanceof z.ZodError) { // Should be caught by initial validation, but good practice
+        return NextResponse.json({ message: 'Validation error', errors: error.errors }, { status: 400 });
+    }
     return NextResponse.json({ message: 'An unexpected error occurred.' }, { status: 500 });
   }
 }
