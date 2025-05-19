@@ -32,7 +32,6 @@ export default function RideManagementPage() {
           title: 'Access Denied',
           description: 'You do not have permission to view pending rides.',
         });
-        // Optionally redirect or handle appropriately
         throw new Error('Forbidden: Administrator access required for pending rides.');
       }
       if (!response.ok) {
@@ -58,18 +57,76 @@ export default function RideManagementPage() {
 
   useEffect(() => {
     fetchPendingRides();
-  }, []);
+  }, [toast]); // Added toast to dependencies as it's used in fetchPendingRides
 
-  const handleApproveRide = (rideId: string) => {
-    // TODO: Implement API call to approve ride
-    console.log(`Approving ride ${rideId}`);
-    toast({ title: "Action Placeholder", description: `Approve action for ride ${rideId} to be implemented.` });
+  const handleApproveRide = async (rideId: string) => {
+    try {
+      // TODO: If your API requires auth tokens, include them in the headers
+      // const token = getAuthToken();
+      // const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const response = await fetch(`/api/admin/rides/${rideId}/approve`, {
+        method: 'PATCH',
+        // headers,
+      });
+
+      if (response.status === 403) {
+         toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to perform this action.' });
+         return;
+      }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to approve ride ${rideId}.`);
+      }
+
+      const result = await response.json();
+      setPendingRides((prevRides) => prevRides.filter(ride => ride.id !== rideId));
+      toast({
+        title: 'Ride Approved',
+        description: result.message || `Ride ${result.ride?.name || rideId} has been approved.`,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      toast({
+        variant: 'destructive',
+        title: 'Approval Failed',
+        description: errorMessage,
+      });
+    }
   };
 
-  const handleRejectRide = (rideId: string) => {
-    // TODO: Implement API call to reject ride
-    console.log(`Rejecting ride ${rideId}`);
-    toast({ title: "Action Placeholder", description: `Reject action for ride ${rideId} to be implemented.` });
+  const handleRejectRide = async (rideId: string) => {
+    try {
+      // TODO: If your API requires auth tokens, include them in the headers
+      // const token = getAuthToken();
+      // const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const response = await fetch(`/api/admin/rides/${rideId}/reject`, {
+        method: 'PATCH',
+        // headers,
+        // body: JSON.stringify({ reason: 'Optional rejection reason' }) // If you implement reason in API
+      });
+
+       if (response.status === 403) {
+         toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to perform this action.' });
+         return;
+      }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to reject ride ${rideId}.`);
+      }
+      const result = await response.json();
+      setPendingRides((prevRides) => prevRides.filter(ride => ride.id !== rideId));
+      toast({
+        title: 'Ride Rejected',
+        description: result.message || `Ride ${result.ride?.name || rideId} has been rejected.`,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      toast({
+        variant: 'destructive',
+        title: 'Rejection Failed',
+        description: errorMessage,
+      });
+    }
   };
 
   return (
@@ -193,5 +250,4 @@ export default function RideManagementPage() {
     </div>
   );
 }
-
     
