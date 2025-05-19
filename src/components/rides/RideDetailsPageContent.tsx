@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Ride, User } from '@/types';
@@ -9,7 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PhotoUploadForm } from './PhotoUploadForm';
-import { CalendarDays, Users, MapPin, UserCircle, MessageCircle, Image as ImageIcon, Route, HelpCircle } from 'lucide-react';
+import { CalendarDays, Users, MapPin, UserCircle, MessageCircle, Image as ImageIcon, Route, HelpCircle, UploadCloud } from 'lucide-react';
+import { Input } from '@/components/ui/input'; // Added import
 
 interface RideDetailsPageContentProps {
   ride: Ride;
@@ -208,6 +210,3 @@ export function RideDetailsPageContent({ ride }: RideDetailsPageContentProps) {
     </div>
   );
 }
-
-// Needed for UploadCloud icon in PhotoUploadForm.tsx, but used as a wrapper here
-import { UploadCloud } from 'lucide-react'; 
