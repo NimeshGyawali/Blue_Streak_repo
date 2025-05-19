@@ -58,7 +58,6 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
     setIsLoading(true);
     const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
     
-    // For signup, we only send necessary fields to backend, confirmPassword is client-side only
     const payload = mode === 'signup' ? 
       (() => {
         const { confirmPassword, ...rest } = values as z.infer<typeof signupSchema>;
@@ -82,8 +81,6 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
           title: result.message || (mode === 'login' ? 'Login Successful' : 'Signup Successful'),
           description: mode === 'login' ? 'Welcome back!' : 'Your account has been created.',
         });
-        // TODO: Handle session/token from 'result.token' and store user data 'result.user'
-        // For now, redirect to homepage on success
         router.push('/'); 
       } else {
         toast({
@@ -123,7 +120,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                   <FormItem>
                     <FormLabel>Full Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Doe" {...field} disabled={isLoading} />
+                      <Input type="text" placeholder="John Doe" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -178,7 +175,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                     <FormItem>
                       <FormLabel>City / Region</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Los Angeles" {...field} disabled={isLoading} />
+                        <Input type="text" placeholder="e.g., Los Angeles" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -191,7 +188,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                     <FormItem>
                       <FormLabel>Yamaha Bike Model</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., YZF-R1" {...field} disabled={isLoading} />
+                        <Input type="text" placeholder="e.g., YZF-R1" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -204,7 +201,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                     <FormItem>
                       <FormLabel>VIN (Vehicle Identification Number)</FormLabel>
                       <FormControl>
-                        <Input placeholder="17-character VIN" {...field} disabled={isLoading} />
+                        <Input type="text" placeholder="17-character VIN" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormDescription>This helps us verify your Yamaha ownership.</FormDescription>
                       <FormMessage />
