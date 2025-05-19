@@ -6,14 +6,15 @@ import { PageTitle } from '@/components/ui/PageTitle';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Users, Bike, Bell, BarChart3, TrendingUp, UsersRound, Activity, AlertTriangle as AlertTriangleIcon } from 'lucide-react';
+import { Users, Bike, Bell, BarChart3, TrendingUp, UsersRound, Activity, AlertTriangle as AlertTriangleIcon, ShieldAlert } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
 
 
-// --- Mock Data Structures & Fetch Functions (Replace with actual API calls) ---
+// --- Data Structures (mirror what backend APIs will return) ---
 interface DashboardStats {
   totalUsers: number;
   verifiedUsers: number;
@@ -46,9 +47,9 @@ interface ChapterActivity {
   isBelowThreshold: boolean;
 }
 
-const MIN_MONTHLY_RIDES_THRESHOLD = 2; // Example threshold
+const MIN_MONTHLY_RIDES_THRESHOLD = 2; // Example threshold (should match backend if hardcoded)
 
-// --- End Mock Data ---
+// --- End Data ---
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -56,54 +57,59 @@ export default function AdminDashboardPage() {
   const [monthlyRideData, setMonthlyRideData] = useState<MonthlyRideStats[]>([]);
   const [chapterActivity, setChapterActivity] = useState<ChapterActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  async function fetchDashboardData() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // TODO: Add auth headers if required for these API calls
+      const [
+        statsResponse, 
+        recentRidesResponse, 
+        monthlyRideDataResponse, 
+        chapterActivityResponse
+      ] = await Promise.all([
+        fetch('/api/admin/dashboard/stats'),
+        fetch('/api/admin/dashboard/recent-rides'),
+        fetch('/api/admin/dashboard/monthly-rides-volume'),
+        fetch('/api/admin/dashboard/chapter-activity'),
+      ]);
+
+      if (!statsResponse.ok) throw new Error(`Failed to fetch stats: ${statsResponse.statusText}`);
+      if (!recentRidesResponse.ok) throw new Error(`Failed to fetch recent rides: ${recentRidesResponse.statusText}`);
+      if (!monthlyRideDataResponse.ok) throw new Error(`Failed to fetch monthly ride data: ${monthlyRideDataResponse.statusText}`);
+      if (!chapterActivityResponse.ok) throw new Error(`Failed to fetch chapter activity: ${chapterActivityResponse.statusText}`);
+      
+      const statsData = await statsResponse.json();
+      const recentRidesData = await recentRidesResponse.json();
+      const monthlyRideChartData = await monthlyRideDataResponse.json();
+      const chapterActivityData = await chapterActivityResponse.json();
+
+      setStats(statsData);
+      setRecentRides(recentRidesData);
+      setMonthlyRideData(monthlyRideChartData);
+      setChapterActivity(chapterActivityData);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred while fetching dashboard data.';
+      setError(errorMessage);
+      toast({
+        variant: 'destructive',
+        title: 'Error Fetching Dashboard Data',
+        description: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
-    // Simulate fetching all dashboard data
-    const fetchData = async () => {
-      setIsLoading(true);
-      // TODO: Replace with actual API calls to e.g.:
-      // /api/admin/dashboard/stats
-      // /api/admin/dashboard/recent-rides
-      // /api/admin/dashboard/monthly-rides
-      // /api/admin/dashboard/chapter-activity
-
-      // Simulating API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Mock data initialization
-      setStats({
-        totalUsers: 150,
-        verifiedUsers: 120,
-        pendingUserVerifications: 5, // Placeholder
-        totalRides: 75,
-        upcomingRides: 10,
-        pendingRideApprovals: 2, // Placeholder
-        activeSystemAlerts: 1, // Placeholder
-      });
-      setRecentRides([
-        { id: 'ride1', name: 'Sunset Cruise', status: 'Ongoing', participantsCount: 15, startTime: '18:00 Today', captain: 'Admin User' },
-        { id: 'ride2', name: 'Mountain Challenge', status: 'Upcoming', participantsCount: 25, startTime: '09:00 Tomorrow', captain: 'Jane Doe' },
-        { id: 'ride3', name: 'City Tour', status: 'Recently Completed', participantsCount: 10, captain: 'John Smith' },
-      ]);
-      setMonthlyRideData([
-        { month: 'Jan', rides: 12 },
-        { month: 'Feb', rides: 18 },
-        { month: 'Mar', rides: 15 },
-        { month: 'Apr', rides: 22 },
-        { month: 'May', rides: 10 }, // Current month (example)
-      ]);
-      setChapterActivity([
-        { id: 'chapter1', name: 'Downtown Riders', ridesThisMonth: 5, membersCount: 30, isBelowThreshold: false },
-        { id: 'chapter2', name: 'Westside Wheelers', ridesThisMonth: 1, membersCount: 15, isBelowThreshold: true },
-        { id: 'chapter3', name: 'North County Cruisers', ridesThisMonth: 3, membersCount: 25, isBelowThreshold: false },
-      ]);
-      setIsLoading(false);
-    };
-    fetchData();
+    fetchDashboardData();
   }, []);
 
   if (isLoading) {
-    // TODO: Implement a more sophisticated loading skeleton for the dashboard
     return (
       <div className="space-y-8">
         <PageTitle title="Admin Dashboard" description="Loading dashboard data..." />
@@ -111,6 +117,23 @@ export default function AdminDashboardPage() {
           <Activity className="h-12 w-12 animate-spin mx-auto text-primary" />
           <p className="mt-2 text-muted-foreground">Fetching latest information...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <PageTitle title="Admin Dashboard" description="Overview of Yamaha Blue Streaks activities and management tools." />
+        <Card className="border-destructive bg-destructive/10">
+          <CardHeader>
+            <CardTitle className="text-destructive flex items-center gap-2"><ShieldAlert /> Error Loading Dashboard</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>{error}</p>
+            <Button onClick={fetchDashboardData} className="mt-4" variant="secondary">Try Again</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -129,9 +152,9 @@ export default function AdminDashboardPage() {
               <Users className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalUsers || 'N/A'}</div>
+              <div className="text-2xl font-bold">{stats?.totalUsers ?? 'N/A'}</div>
               <p className="text-xs text-muted-foreground">
-                {stats?.verifiedUsers || 0} verified, {stats?.pendingUserVerifications || 0} pending
+                {stats?.verifiedUsers ?? 0} verified, {stats?.pendingUserVerifications ?? 0} pending
               </p>
             </CardContent>
           </Card>
@@ -141,9 +164,9 @@ export default function AdminDashboardPage() {
               <Bike className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalRides || 'N/A'}</div>
+              <div className="text-2xl font-bold">{stats?.totalRides ?? 'N/A'}</div>
               <p className="text-xs text-muted-foreground">
-                {stats?.upcomingRides || 0} upcoming, {stats?.pendingRideApprovals || 0} pending approval
+                {stats?.upcomingRides ?? 0} upcoming, {stats?.pendingRideApprovals ?? 0} pending approval
               </p>
             </CardContent>
           </Card>
@@ -153,19 +176,19 @@ export default function AdminDashboardPage() {
               <Bell className="h-5 w-5 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">{stats?.activeSystemAlerts || 0}</div>
+              <div className="text-2xl font-bold text-destructive">{stats?.activeSystemAlerts ?? 0}</div>
               <Link href="/admin/alerts" className="text-xs text-muted-foreground hover:text-primary">
                 View Alerts
               </Link>
             </CardContent>
           </Card>
-           <Card className="shadow-md hover:shadow-lg transition-shadow">
+           <Card className="shadow-md hover:shadow-lg transition-shadow"> {/* Example additional metric */}
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Community Growth</CardTitle>
               <TrendingUp className="h-5 w-5 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">+5% this month</div>
+              <div className="text-2xl font-bold">+X% this month</div> {/* Replace X with dynamic data */}
               <p className="text-xs text-muted-foreground">
                 User and ride activity trend
               </p>
@@ -342,10 +365,8 @@ export default function AdminDashboardPage() {
       </Card>
       
       <p className="text-sm text-muted-foreground mt-6 text-center">
-        Note: Most dynamic data on this dashboard is currently using mock values. Backend APIs need to be implemented for real-time information.
+        Note: Dashboard data is currently fetched from API endpoints returning mock values. Backend database queries need to be implemented for real-time information.
       </p>
     </div>
   );
 }
-
-    
