@@ -1,57 +1,53 @@
 
+'use client';
+
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { RideCard } from '@/components/rides/RideCard';
-import type { Ride } from '@/types'; // Assuming types are defined in @/types
-
-// Mock data for featured rides
-const featuredRides: Ride[] = [
-  {
-    id: '1',
-    name: 'Sunrise Coastal Cruise',
-    type: 'Chapter',
-    dateTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
-    route: { start: 'City Center', end: 'Ocean View Point' },
-    captain: { id: 'capt1', name: 'Captain Dave' },
-    participants: Array(5).fill(null).map((_, i) => ({ id: `user${i}`, name: `Rider ${i+1}` })),
-    status: 'Upcoming',
-    thumbnailUrl: 'https://placehold.co/600x400.png',
-    photoHints: 'motorcycle landscape'
-  },
-  {
-    id: '2',
-    name: 'Mountain Twisties Challenge',
-    type: 'Flagship',
-    dateTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-    route: { start: 'Mountain Base', end: 'Summit Peak' },
-    captain: { id: 'capt2', name: 'Admin Yamaha' },
-    participants: Array(15).fill(null).map((_, i) => ({ id: `userB${i}`, name: `Adventurer ${i+1}` })),
-    status: 'Upcoming',
-    thumbnailUrl: 'https://placehold.co/600x400.png',
-    photoHints: 'mountain road'
-  },
-  {
-    id: '3',
-    name: 'Weekend Coffee Meetup',
-    type: 'Micro',
-    dateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-    route: { start: 'Local Cafe', end: 'Local Cafe' },
-    captain: { id: 'userX', name: 'Rider Sarah' },
-    participants: Array(3).fill(null).map((_, i) => ({ id: `userC${i}`, name: `Cafe Rider ${i+1}` })),
-    status: 'Upcoming',
-    thumbnailUrl: 'https://placehold.co/600x400.png',
-    photoHints: 'cafe motorcycle'
-  },
-];
+import type { Ride } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function HomePage() {
+  const [featuredRides, setFeaturedRides] = useState<Ride[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    async function fetchFeaturedRides() {
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/rides'); // Using the same endpoint
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch featured rides.');
+        }
+        const allRides: Ride[] = await response.json();
+        // Select first 3 rides as "featured" or implement more specific logic
+        setFeaturedRides(allRides.slice(0, 3)); 
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+        toast({
+          variant: 'destructive',
+          title: 'Error Fetching Featured Rides',
+          description: errorMessage,
+        });
+        setFeaturedRides([]); // Clear rides on error
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchFeaturedRides();
+  }, [toast]);
+
   return (
     <div className="space-y-12">
       <section className="relative text-center py-16 md:py-24 rounded-lg overflow-hidden shadow-xl bg-gradient-to-r from-primary to-blue-700">
         <div className="absolute inset-0 opacity-20">
           <Image 
-            src="https://placehold.co/1200x400.png" // Replace with actual hero image
+            src="https://placehold.co/1200x400.png"
             alt="Motorcycle riding background" 
             fill={true}
             className="object-cover"
@@ -74,11 +70,21 @@ export default function HomePage() {
 
       <section>
         <h2 className="text-3xl font-semibold mb-6 text-center text-foreground">Featured Rides</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {featuredRides.map((ride) => (
-            <RideCard key={ride.id} ride={ride} />
-          ))}
-        </div>
+        {isLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map(n => <CardSkeleton key={n} />)}
+          </div>
+        )}
+        {!isLoading && featuredRides.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featuredRides.map((ride) => (
+              <RideCard key={ride.id} ride={ride} />
+            ))}
+          </div>
+        )}
+        {!isLoading && featuredRides.length === 0 && (
+           <p className="text-center text-muted-foreground py-6">No featured rides available at the moment. Check back soon!</p>
+        )}
         <div className="text-center mt-8">
           <Button variant="outline" asChild>
             <Link href="/rides">View All Rides</Link>
@@ -102,6 +108,23 @@ export default function HomePage() {
             </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+// Skeleton component for RideCard
+function CardSkeleton() {
+  return (
+    <div className="flex flex-col space-y-3 p-4 border rounded-lg shadow-lg">
+      <Skeleton className="h-48 w-full rounded-md" />
+      <div className="space-y-2">
+        <Skeleton className="h-6 w-3/4" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-1/2 mt-2" />
+        <Skeleton className="h-4 w-1/2" />
+      </div>
+      <Skeleton className="h-10 w-full mt-2" />
     </div>
   );
 }
