@@ -82,19 +82,19 @@ export async function GET(request: NextRequest) {
     
     const result = await client.query(query);
     
-    const monthlyRideData: MonthlyRideStats[] = result.rows.map(row => ({
+    const monthlyRideDataFromDb: MonthlyRideStats[] = result.rows.map(row => ({
       month: row.month_name, // e.g., "Jan", "Feb"
       rides: parseInt(row.rides_count, 10),
     }));
     
-    // If you want to ensure all last 6 months are present, even with 0 rides:
+    // Ensure all last 6 months are present, even with 0 rides:
     const allMonthsData: MonthlyRideStats[] = [];
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const today = new Date();
-    for (let i = 5; i >= 0; i--) {
+    for (let i = 5; i >= 0; i--) { // Iterate from 5 months ago up to the current month
         const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
         const monthShortName = monthNames[date.getMonth()];
-        const existingData = monthlyRideData.find(d => d.month === monthShortName);
+        const existingData = monthlyRideDataFromDb.find(d => d.month === monthShortName && new Date(date.getFullYear(), date.getMonth()).getFullYear() === new Date(today.getFullYear(), today.getMonth() -i).getFullYear() ); // Ensure year matches for finding data
         allMonthsData.push({
             month: monthShortName,
             rides: existingData ? existingData.rides : 0,
