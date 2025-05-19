@@ -1,5 +1,6 @@
+
 import Link from 'next/link';
-import { Bike, User, LogIn, UserPlus, Trophy, Compass } from 'lucide-react';
+import { Bike, User, LogIn, UserPlus, Trophy, Compass, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -8,6 +9,8 @@ export function Header() {
   // Mock user state
   const isLoggedIn = false; 
   const userName = "Rider One";
+  // TODO: Replace this mock isAdmin flag with actual admin state detection from your auth system
+  const isAdmin = true; 
 
   return (
     <header className="bg-card border-b border-border shadow-sm sticky top-0 z-50">
@@ -28,6 +31,13 @@ export function Header() {
               <Trophy size={18} /> Leaderboard
             </Link>
           </Button>
+          {isAdmin && (
+            <Button variant="ghost" asChild>
+              <Link href="/admin" className="flex items-center gap-1">
+                <Shield size={18} /> Admin Panel
+              </Link>
+            </Button>
+          )}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -54,6 +64,12 @@ export function Header() {
                 <DropdownMenuItem asChild>
                   <Link href="/profile">Profile</Link>
                 </DropdownMenuItem>
+                {/* Conditionally render Admin Panel link here too if desired for logged-in admins */}
+                {/* {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin">Admin Panel</Link>
+                  </DropdownMenuItem>
+                )} */}
                 <DropdownMenuItem>
                   Settings
                 </DropdownMenuItem>
