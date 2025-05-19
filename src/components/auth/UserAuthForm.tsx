@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation'; // For redirection
+import { useRouter } from 'next/navigation'; 
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -58,6 +58,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
     setIsLoading(true);
     const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
     
+    // For signup, remove confirmPassword before sending to API
     const payload = mode === 'signup' ? 
       (() => {
         const { confirmPassword, ...rest } = values as z.infer<typeof signupSchema>;
@@ -77,15 +78,25 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
       const result = await response.json();
 
       if (response.ok) {
+        const successMessage = mode === 'login' 
+          ? `Welcome back${result.user?.name ? `, ${result.user.name}` : ''}!` 
+          : `Account created for ${result.user?.name || 'you'}!`;
+        
         toast({
-          title: result.message || (mode === 'login' ? 'Login Successful' : 'Signup Successful'),
-          description: mode === 'login' ? 'Welcome back!' : 'Your account has been created.',
+          title: mode === 'login' ? 'Login Successful' : 'Signup Successful',
+          description: successMessage,
         });
+        
+        form.reset(); // Reset form fields
+
+        // TODO: Implement proper session management (e.g., store JWT token)
+        // For now, we'll just redirect.
         router.push('/'); 
+        router.refresh(); // This helps ensure the header might re-render if it depended on server-side session checks
       } else {
         toast({
           variant: 'destructive',
-          title: 'Authentication Failed',
+          title: mode === 'login' ? 'Login Failed' : 'Signup Failed',
           description: result.message || 'An error occurred. Please try again.',
         });
       }
