@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { CheckCircle, XCircle, UserCheck, Hourglass } from 'lucide-react';
+import { CheckCircle, XCircle, UserCheck, Hourglass, ShieldAlert } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface AdminUser {
   id: string;
@@ -28,13 +29,26 @@ export default function UserManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   async function fetchUsers() {
     setIsLoading(true);
     setError(null);
     try {
-      // TODO: Add authentication headers if your API requires them for admin access
-      const response = await fetch('/api/admin/users');
+      // TODO: If your API requires auth tokens, include them in the headers
+      // const token = getAuthToken(); // Your function to get the token
+      // const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const response = await fetch('/api/admin/users'/*, { headers }*/);
+      
+      if (response.status === 403) { // Forbidden
+        toast({
+          variant: 'destructive',
+          title: 'Access Denied',
+          description: 'You do not have permission to view this page.',
+        });
+        router.push('/auth/login'); // Or to a "not authorized" page or home
+        throw new Error('Forbidden: Administrator access required.');
+      }
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch users.');
@@ -43,12 +57,14 @@ export default function UserManagementPage() {
       setUsers(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-      setError(errorMessage);
-      toast({
-        variant: 'destructive',
-        title: 'Error fetching users',
-        description: errorMessage,
-      });
+      if (errorMessage !== 'Forbidden: Administrator access required.') { // Avoid double toast for 403
+        setError(errorMessage);
+        toast({
+          variant: 'destructive',
+          title: 'Error fetching users',
+          description: errorMessage,
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -60,11 +76,18 @@ export default function UserManagementPage() {
 
   async function handleVerifyUser(userId: string) {
     try {
-      // TODO: Add authentication headers
+      // TODO: If your API requires auth tokens, include them in the headers
+      // const token = getAuthToken();
+      // const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
       const response = await fetch(`/api/admin/users/${userId}/verify`, {
         method: 'PATCH',
+        // headers,
       });
 
+      if (response.status === 403) {
+         toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to perform this action.' });
+         return;
+      }
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `Failed to verify user ${userId}.`);
@@ -108,7 +131,7 @@ export default function UserManagementPage() {
         <PageTitle title="User Management" description="Verify new users and manage existing accounts." />
         <Card className="border-destructive">
           <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2"><XCircle /> Error</CardTitle>
+            <CardTitle className="text-destructive flex items-center gap-2"><ShieldAlert /> Error Loading Users</CardTitle>
           </CardHeader>
           <CardContent>
             <p>{error}</p>
