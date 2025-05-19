@@ -14,7 +14,7 @@ export function Header() {
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors">
           <Bike className="h-8 w-8" />
-          <span className="font-bold text-xl">Yamaha MotoConnect</span>
+          <span className="font-bold text-xl">Yamaha Blue Streaks</span>
         </Link>
         
         <nav className="hidden md:flex items-center gap-4">

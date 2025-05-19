@@ -60,10 +60,10 @@ export default function HomePage() {
         </div>
         <div className="relative container mx-auto px-4">
           <h1 className="text-4xl md:text-5xl font-bold text-primary-foreground mb-4">
-            Welcome to Yamaha MotoConnect
+            Welcome to Yamaha Blue Streaks
           </h1>
           <p className="text-lg md:text-xl text-primary-foreground/90 mb-8 max-w-2xl mx-auto">
-            Discover exciting rides, connect with fellow Yamaha enthusiasts, and share your passion for the open road.
+            Discover exciting rides, connect with fellow Yamaha enthusiasts, and share your passion for the open road with Yamaha Blue Streaks.
           </p>
           <Button size="lg" asChild className="bg-accent hover:bg-accent/90 text-accent-foreground">
             <Link href="/rides">Explore Rides</Link>

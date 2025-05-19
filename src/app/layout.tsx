@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Yamaha MotoConnect',
-  description: 'Connect with Yamaha riders, join events, and share your passion.',
+  title: 'Yamaha Blue Streaks',
+  description: 'Connect with Yamaha riders, join events, and share your passion with Yamaha Blue Streaks.',
 };
 
 export default function RootLayout({

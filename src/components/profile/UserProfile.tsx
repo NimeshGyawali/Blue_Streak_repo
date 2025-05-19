@@ -61,7 +61,7 @@ export function UserProfile({ user, rideHistory, achievements }: UserProfileProp
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Navigation size={22} className="text-primary"/> Ride History</CardTitle>
-            <CardDescription>Your past adventures on Yamaha MotoConnect.</CardDescription>
+            <CardDescription>Your past adventures on Yamaha Blue Streaks.</CardDescription>
           </CardHeader>
           <CardContent>
             {rideHistory.length === 0 ? (

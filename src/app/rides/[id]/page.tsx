@@ -69,7 +69,7 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
     return { title: 'Ride Not Found' }
   }
   return {
-    title: `${ride.name} | Yamaha MotoConnect`,
+    title: `${ride.name} | Yamaha Blue Streaks`,
     description: ride.description || `Details for the ${ride.type} ride: ${ride.name}.`,
   }
 }

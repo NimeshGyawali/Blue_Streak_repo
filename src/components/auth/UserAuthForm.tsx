@@ -63,7 +63,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
       <CardHeader>
         <CardTitle>{mode === 'login' ? 'Welcome Back!' : 'Create Your Account'}</CardTitle>
         <CardDescription>
-          {mode === 'login' ? 'Log in to access your MotoConnect profile.' : 'Join the Yamaha MotoConnect community.'}
+          {mode === 'login' ? 'Log in to access your Yamaha Blue Streaks profile.' : 'Join the Yamaha Blue Streaks community.'}
         </CardDescription>
       </CardHeader>
       <Form {...form}>

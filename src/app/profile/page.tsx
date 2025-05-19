@@ -40,7 +40,7 @@ const mockRideHistory: Ride[] = [
 
 // Mock achievements
 const mockAchievements: { id: string; name: string; description: string; icon?: React.ElementType, dateEarned: Date }[] = [
-  { id: 'ach01', name: 'First Ride Completed', description: 'You completed your first MotoConnect ride!', dateEarned: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000) },
+  { id: 'ach01', name: 'First Ride Completed', description: 'You completed your first Yamaha Blue Streaks ride!', dateEarned: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000) },
   { id: 'ach02', name: 'Road Captain', description: 'Successfully led a Micro-Ride.', dateEarned: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) },
   { id: 'ach03', name: 'Weekend Warrior', description: 'Completed 3 rides in a single month.', dateEarned: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
 ];
@@ -48,7 +48,7 @@ const mockAchievements: { id: string; name: string; description: string; icon?: 
 export default function ProfilePage() {
   return (
     <div className="space-y-8">
-      <PageTitle title="My Profile" description="View and manage your Yamaha MotoConnect profile." />
+      <PageTitle title="My Profile" description="View and manage your Yamaha Blue Streaks profile." />
       <UserProfile user={mockUser} rideHistory={mockRideHistory} achievements={mockAchievements} />
     </div>
   );
