@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation'; 
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -40,6 +41,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const schema = mode === 'login' ? loginSchema : signupSchema;
+  const { login: authLogin } = useAuth(); // Get login function from AuthContext
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -58,7 +60,6 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
     setIsLoading(true);
     const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
     
-    // For signup, remove confirmPassword before sending to API
     const payload = mode === 'signup' ? 
       (() => {
         const { confirmPassword, ...rest } = values as z.infer<typeof signupSchema>;
@@ -77,22 +78,24 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
 
       const result = await response.json();
 
-      if (response.ok) {
+      if (response.ok && result.user) {
         const successMessage = mode === 'login' 
           ? `Welcome back${result.user?.name ? `, ${result.user.name}` : ''}!` 
-          : `Account created for ${result.user?.name || 'you'}!`;
+          : `Account created for ${result.user?.name || 'you'}! Welcome!`;
         
         toast({
           title: mode === 'login' ? 'Login Successful' : 'Signup Successful',
           description: successMessage,
         });
         
-        form.reset(); // Reset form fields
-
-        // TODO: Implement proper session management (e.g., store JWT token)
-        // For now, we'll just redirect.
+        // Use AuthContext to set user state
+        // Assuming result.user contains necessary User fields (id, name, email, is_admin)
+        // And result.token might contain an auth token
+        authLogin(result.user, result.token); 
+        
+        form.reset(); 
         router.push('/'); 
-        router.refresh(); // This helps ensure the header might re-render if it depended on server-side session checks
+        // router.refresh() might not be needed if Header updates via context
       } else {
         toast({
           variant: 'destructive',
@@ -223,7 +226,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
             )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || form.formState.isSubmitting}>
               {isLoading ? 'Processing...' : (mode === 'login' ? 'Login' : 'Sign Up')}
             </Button>
             {mode === 'login' ? (
