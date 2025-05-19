@@ -1,11 +1,52 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
-// import { pool } from '@/lib/db'; // For when you connect to the DB
+import { pool } from '@/lib/db';
+import { JWT_SECRET } from '@/lib/authConstants';
+import jwt from 'jsonwebtoken';
+import type { User } from '@/types';
+import { format } from 'date-fns';
 
-// TODO: Replace this with your actual admin authentication logic
-async function checkAdminStatus(request: NextRequest): Promise<boolean> {
-  console.warn("SECURITY WARNING: Admin check in /api/admin/dashboard/recent-rides GET is a placeholder. IMPLEMENT REAL ADMIN AUTHENTICATION.");
-  return true; // REMOVE THIS AND IMPLEMENT REAL LOGIC
+interface DecodedToken {
+  userId: string;
+  isAdmin: boolean;
+  iat: number;
+}
+
+interface AdminAuthResult {
+  isAdmin: boolean;
+  userId?: string;
+  error?: string;
+  status?: number;
+}
+
+// TODO: Replace this with your actual robust admin authentication logic if not already done
+async function checkAdminStatus(request: NextRequest): Promise<AdminAuthResult> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { isAdmin: false, error: 'Authorization header missing or malformed.', status: 401 };
+  }
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return { isAdmin: false, error: 'Token not found.', status: 401 };
+  }
+
+  try {
+    if (!JWT_SECRET) {
+      console.error('JWT_SECRET is not defined. Cannot verify token.');
+      return { isAdmin: false, error: 'JWT secret not configured.', status: 500 };
+    }
+    const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+    if (!decoded.isAdmin) {
+      return { isAdmin: false, error: 'Forbidden: Administrator access required.', status: 403 };
+    }
+    return { isAdmin: true, userId: decoded.userId };
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return { isAdmin: false, error: `Invalid token: ${error.message}`, status: 401 };
+    }
+    console.error('Admin check error:', error);
+    return { isAdmin: false, error: 'Internal server error during token validation.', status: 500 };
+  }
 }
 
 interface RecentRideActivity {
@@ -13,28 +54,67 @@ interface RecentRideActivity {
   name: string;
   status: 'Ongoing' | 'Upcoming' | 'Recently Completed';
   participantsCount: number;
-  startTime?: string;
+  startTime?: string; // Formatted start time for display
   captain: string;
+  dateTime: string; // Raw ISO date for potential client-side formatting
 }
 
 export async function GET(request: NextRequest) {
+  const adminAuth = await checkAdminStatus(request);
+  if (!adminAuth.isAdmin) {
+    return NextResponse.json({ message: adminAuth.error || 'Forbidden: Administrator access required.' }, { status: adminAuth.status || 403 });
+  }
+
+  const client = await pool.connect();
   try {
-    const isAdmin = await checkAdminStatus(request);
-    if (!isAdmin) {
-      return NextResponse.json({ message: 'Forbidden: Administrator access required.' }, { status: 403 });
-    }
+    const query = `
+      SELECT
+          r.id::text,
+          r.name,
+          r.status,
+          r.date_time,
+          u.name as captain_name,
+          (SELECT COUNT(*) FROM ride_participants rp WHERE rp.ride_id = r.id) as participants_count
+      FROM
+          rides r
+      JOIN
+          users u ON r.captain_id = u.id
+      WHERE
+          r.status IN ('Ongoing', 'Upcoming', 'Completed')
+      ORDER BY
+          CASE r.status
+              WHEN 'Ongoing' THEN 1
+              WHEN 'Upcoming' THEN 2
+              WHEN 'Completed' THEN 3
+              ELSE 4
+          END,
+          CASE r.status
+              WHEN 'Upcoming' THEN r.date_time ASC
+              WHEN 'Ongoing' THEN r.date_time ASC 
+              WHEN 'Completed' THEN r.date_time DESC
+              ELSE r.date_time ASC
+          END
+      LIMIT 5;
+    `;
+    
+    const result = await client.query(query);
+    
+    const recentRides: RecentRideActivity[] = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      status: row.status as RecentRideActivity['status'],
+      participantsCount: parseInt(row.participants_count, 10),
+      startTime: row.status !== 'Completed' ? format(new Date(row.date_time), 'MMM dd, HH:mm') : undefined,
+      captain: row.captain_name,
+      dateTime: new Date(row.date_time).toISOString(),
+    }));
 
-    // TODO: Replace with actual database queries
-    const mockRecentRides: RecentRideActivity[] = [
-      { id: 'ride101', name: 'Morning Mist Ride', status: 'Ongoing', participantsCount: 18, startTime: '08:00 Today', captain: 'Admin User' },
-      { id: 'ride102', name: 'Weekend Hill Climb', status: 'Upcoming', participantsCount: 22, startTime: '10:00 Saturday', captain: 'Jane Doe' },
-      { id: 'ride103', name: 'Historical Route Tour', status: 'Recently Completed', participantsCount: 12, captain: 'John Smith' },
-    ];
-
-    return NextResponse.json(mockRecentRides, { status: 200 });
+    return NextResponse.json(recentRides, { status: 200 });
 
   } catch (error) {
     console.error('Get Recent Rides API error:', error);
     return NextResponse.json({ message: 'An unexpected error occurred fetching recent rides.' }, { status: 500 });
+  } finally {
+    client.release();
   }
 }

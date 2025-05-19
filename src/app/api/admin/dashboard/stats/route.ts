@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     const verifiedUsersRes = await client.query("SELECT COUNT(*) AS count FROM users WHERE is_verified = TRUE");
     stats.verifiedUsers = parseInt(verifiedUsersRes.rows[0].count, 10);
     
-    stats.pendingUserVerifications = stats.totalUsers - stats.verifiedUsers;
+    stats.pendingUserVerifications = (stats.totalUsers || 0) - (stats.verifiedUsers || 0);
 
     const totalRidesRes = await client.query('SELECT COUNT(*) AS count FROM rides');
     stats.totalRides = parseInt(totalRidesRes.rows[0].count, 10);
