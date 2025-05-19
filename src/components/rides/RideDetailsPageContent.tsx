@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PhotoUploadForm } from './PhotoUploadForm';
 import { CalendarDays, Users, MapPin, UserCircle, MessageCircle, Image as ImageIcon, Route, HelpCircle, UploadCloud } from 'lucide-react';
-import { Input } from '@/components/ui/input'; // Added import
+import { Input } from '@/components/ui/input';
 
 interface RideDetailsPageContentProps {
   ride: Ride;
@@ -55,8 +55,8 @@ export function RideDetailsPageContent({ ride }: RideDetailsPageContentProps) {
           <Image
             src={ride.thumbnailUrl || `https://placehold.co/1200x400.png`}
             alt={ride.name}
-            layout="fill"
-            objectFit="cover"
+            fill={true}
+            className="object-cover"
             priority
             data-ai-hint={ride.photoHints || "motorcycle adventure"}
           />
@@ -188,7 +188,7 @@ export function RideDetailsPageContent({ ride }: RideDetailsPageContentProps) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {mockPhotos.map((photo, index) => (
                     <div key={index} className="group relative aspect-square overflow-hidden rounded-lg shadow-md">
-                      <Image src={photo.url} alt={photo.caption || `Ride photo ${index + 1}`} layout="fill" objectFit="cover" data-ai-hint={photo.dataAiHint || "motorcycle image"} />
+                      <Image src={photo.url} alt={photo.caption || `Ride photo ${index + 1}`} fill={true} className="object-cover" data-ai-hint={photo.dataAiHint || "motorcycle image"} />
                       {photo.caption && (
                         <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-2 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity">
                           <p>{photo.caption}</p>

@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -52,8 +53,8 @@ export default function HomePage() {
           <Image 
             src="https://placehold.co/1200x400.png" // Replace with actual hero image
             alt="Motorcycle riding background" 
-            layout="fill" 
-            objectFit="cover"
+            fill={true}
+            className="object-cover"
             priority
             data-ai-hint="motorcycle scenic"
           />

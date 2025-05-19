@@ -1,3 +1,4 @@
+
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Ride } from '@/types';
@@ -19,8 +20,8 @@ export function RideCard({ ride }: RideCardProps) {
           <Image
             src={ride.thumbnailUrl || `https://placehold.co/600x400.png`}
             alt={ride.name}
-            layout="fill"
-            objectFit="cover"
+            fill={true}
+            className="object-cover"
             data-ai-hint={ride.photoHints || "motorcycle event"}
           />
           <Badge variant={ride.type === 'Flagship' ? 'default' : ride.type === 'Chapter' ? 'secondary' : 'outline'} className="absolute top-2 right-2 bg-opacity-80 backdrop-blur-sm">

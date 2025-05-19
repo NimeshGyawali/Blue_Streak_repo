@@ -1,3 +1,4 @@
+
 import type { LeaderboardEntry } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -31,46 +32,49 @@ export function LeaderboardTable({ entries, title = "Top Riders" }: LeaderboardT
               </TableCell>
             </TableRow>
           ) : (
-            entries.map((entry) => (
-              <TableRow key={entry.user.id} className="hover:bg-muted/50">
-                <TableCell className="font-medium text-center">
-                  <div className="flex items-center justify-center">
-                    {entry.rank === 1 && <Award size={20} className="text-yellow-500 mr-1" />}
-                    {entry.rank === 2 && <Award size={20} className="text-gray-400 mr-1" />}
-                    {entry.rank === 3 && <Award size={20} className="text-yellow-700 mr-1" />}
-                    {entry.rank}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={entry.user.avatarUrl || `https://placehold.co/40x40.png`} alt={entry.user.name} data-ai-hint="person avatar" />
-                      <AvatarFallback>{entry.user.name.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{entry.user.name}</p>
-                      <p className="text-xs text-muted-foreground hidden sm:block">{entry.user.bikeModel || 'Yamaha Rider'}</p>
+            entries.map((entry) => {
+              const avatarHint = entry.user.bikeModel === 'Chapter Group' ? 'group logo' : 'person avatar';
+              return (
+                <TableRow key={entry.user.id} className="hover:bg-muted/50">
+                  <TableCell className="font-medium text-center">
+                    <div className="flex items-center justify-center">
+                      {entry.rank === 1 && <Award size={20} className="text-yellow-500 mr-1" />}
+                      {entry.rank === 2 && <Award size={20} className="text-gray-400 mr-1" />}
+                      {entry.rank === 3 && <Award size={20} className="text-yellow-700 mr-1" />}
+                      {entry.rank}
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <Bike size={16} className="text-muted-foreground"/> {entry.ridesConducted}
-                  </div>
-                </TableCell>
-                <TableCell className="text-center">{entry.totalDistance.toLocaleString()}</TableCell>
-                <TableCell className="text-center hidden sm:table-cell">
-                  <div className="flex items-center justify-center gap-1">
-                    <Users size={16} className="text-muted-foreground"/> {entry.totalParticipantsInRides.toLocaleString()}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right hidden md:table-cell">
-                  <div className="flex items-center justify-end gap-1">
-                     {entry.score?.toLocaleString() || 'N/A'} <TrendingUp size={16} className="text-green-500"/>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage src={entry.user.avatarUrl || `https://placehold.co/40x40.png`} alt={entry.user.name} data-ai-hint={avatarHint} />
+                        <AvatarFallback>{entry.user.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{entry.user.name}</p>
+                        <p className="text-xs text-muted-foreground hidden sm:block">{entry.user.bikeModel || 'Yamaha Rider'}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Bike size={16} className="text-muted-foreground"/> {entry.ridesConducted}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">{entry.totalDistance.toLocaleString()}</TableCell>
+                  <TableCell className="text-center hidden sm:table-cell">
+                    <div className="flex items-center justify-center gap-1">
+                      <Users size={16} className="text-muted-foreground"/> {entry.totalParticipantsInRides.toLocaleString()}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right hidden md:table-cell">
+                    <div className="flex items-center justify-end gap-1">
+                       {entry.score?.toLocaleString() || 'N/A'} <TrendingUp size={16} className="text-green-500"/>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })
           )}
         </TableBody>
       </Table>
