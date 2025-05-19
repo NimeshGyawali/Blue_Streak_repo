@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation'; // For redirection
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -34,7 +37,10 @@ type UserAuthFormProps = {
 
 export function UserAuthForm({ mode }: UserAuthFormProps) {
   const { toast } = useToast();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
   const schema = mode === 'login' ? loginSchema : signupSchema;
+
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: mode === 'login' ? { email: '', password: '' } : {
@@ -48,14 +54,54 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
     },
   });
 
-  function onSubmit(values: z.infer<typeof schema>) {
-    // In a real app, you'd handle API calls here.
-    console.log(values);
-    toast({
-      title: mode === 'login' ? 'Login Submitted' : 'Signup Submitted',
-      description: 'Form data logged to console. Implement actual auth.',
-    });
-    // form.reset(); // Optionally reset form
+  async function onSubmit(values: z.infer<typeof schema>) {
+    setIsLoading(true);
+    const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup';
+    
+    // For signup, we only send necessary fields to backend, confirmPassword is client-side only
+    const payload = mode === 'signup' ? 
+      (() => {
+        const { confirmPassword, ...rest } = values as z.infer<typeof signupSchema>;
+        return rest;
+      })() 
+      : values;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: result.message || (mode === 'login' ? 'Login Successful' : 'Signup Successful'),
+          description: mode === 'login' ? 'Welcome back!' : 'Your account has been created.',
+        });
+        // TODO: Handle session/token from 'result.token' and store user data 'result.user'
+        // For now, redirect to homepage on success
+        router.push('/'); 
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Authentication Failed',
+          description: result.message || 'An error occurred. Please try again.',
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network Error',
+        description: 'Could not connect to the server. Please try again later.',
+      });
+      console.error('Auth API call error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -77,7 +123,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                   <FormItem>
                     <FormLabel>Full Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Doe" {...field} />
+                      <Input placeholder="John Doe" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -91,7 +137,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="your@email.com" {...field} />
+                    <Input type="email" placeholder="your@email.com" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -104,7 +150,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
+                    <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -119,7 +165,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                     <FormItem>
                       <FormLabel>Confirm Password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
+                        <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -132,7 +178,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                     <FormItem>
                       <FormLabel>City / Region</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Los Angeles" {...field} />
+                        <Input placeholder="e.g., Los Angeles" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -145,7 +191,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                     <FormItem>
                       <FormLabel>Yamaha Bike Model</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., YZF-R1" {...field} />
+                        <Input placeholder="e.g., YZF-R1" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -158,7 +204,7 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
                     <FormItem>
                       <FormLabel>VIN (Vehicle Identification Number)</FormLabel>
                       <FormControl>
-                        <Input placeholder="17-character VIN" {...field} />
+                        <Input placeholder="17-character VIN" {...field} disabled={isLoading} />
                       </FormControl>
                       <FormDescription>This helps us verify your Yamaha ownership.</FormDescription>
                       <FormMessage />
@@ -169,8 +215,8 @@ export function UserAuthForm({ mode }: UserAuthFormProps) {
             )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full">
-              {mode === 'login' ? 'Login' : 'Sign Up'}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Processing...' : (mode === 'login' ? 'Login' : 'Sign Up')}
             </Button>
             {mode === 'login' ? (
               <p className="text-sm text-muted-foreground">
