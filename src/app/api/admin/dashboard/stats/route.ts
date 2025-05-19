@@ -1,7 +1,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
-import { pool } from '@/lib/db'; // For when you connect to the DB
-import { JWT_SECRET } from '@/lib/authConstants';
+import { pool } from '@/lib/db';
+import { JWT_SECRET } from '../../../../../lib/authConstants'; // Corrected relative path
 import jwt from 'jsonwebtoken';
 import type { User } from '@/types';
 
@@ -18,7 +18,7 @@ interface AdminAuthResult {
   status?: number;
 }
 
-// TODO: Replace this with your actual robust admin authentication logic if not already done
+// Updated to use JWT for admin check
 async function checkAdminStatus(request: NextRequest): Promise<AdminAuthResult> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -32,7 +32,7 @@ async function checkAdminStatus(request: NextRequest): Promise<AdminAuthResult> 
   try {
     if (!JWT_SECRET) {
       console.error('JWT_SECRET is not defined. Cannot verify token.');
-      return { isAdmin: false, error: 'JWT secret not configured.', status: 500 };
+      return { isAdmin: false, error: 'JWT secret not configured on server.', status: 500 };
     }
     const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
     if (!decoded.isAdmin) {

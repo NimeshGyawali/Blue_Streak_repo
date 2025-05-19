@@ -1,7 +1,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { JWT_SECRET } from '@/lib/authConstants';
+import { JWT_SECRET } from '../../../../../lib/authConstants'; // Corrected relative path
 import jwt from 'jsonwebtoken';
 import type { User } from '@/types';
 import { format } from 'date-fns';
@@ -19,7 +19,7 @@ interface AdminAuthResult {
   status?: number;
 }
 
-// TODO: Replace this with your actual robust admin authentication logic if not already done
+// Updated to use JWT for admin check
 async function checkAdminStatus(request: NextRequest): Promise<AdminAuthResult> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -33,7 +33,7 @@ async function checkAdminStatus(request: NextRequest): Promise<AdminAuthResult> 
   try {
     if (!JWT_SECRET) {
       console.error('JWT_SECRET is not defined. Cannot verify token.');
-      return { isAdmin: false, error: 'JWT secret not configured.', status: 500 };
+      return { isAdmin: false, error: 'JWT secret not configured on server.', status: 500 };
     }
     const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
     if (!decoded.isAdmin) {
@@ -52,7 +52,7 @@ async function checkAdminStatus(request: NextRequest): Promise<AdminAuthResult> 
 interface RecentRideActivity {
   id: string;
   name: string;
-  status: 'Ongoing' | 'Upcoming' | 'Recently Completed';
+  status: 'Ongoing' | 'Upcoming' | 'Completed'; // Ensure these match your DB enum/values
   participantsCount: number;
   startTime?: string; // Formatted start time for display
   captain: string;
@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
 
   const client = await pool.connect();
   try {
+    // Ensure status values in WHERE and CASE match your database's ride.status enum/values exactly
     const query = `
       SELECT
           r.id::text,
@@ -80,18 +81,18 @@ export async function GET(request: NextRequest) {
       JOIN
           users u ON r.captain_id = u.id
       WHERE
-          r.status IN ('Ongoing', 'Upcoming', 'Completed')
+          r.status IN ('Ongoing', 'Upcoming', 'Completed') 
       ORDER BY
           CASE r.status
               WHEN 'Ongoing' THEN 1
               WHEN 'Upcoming' THEN 2
               WHEN 'Completed' THEN 3
-              ELSE 4
+              ELSE 4 
           END,
-          CASE r.status
-              WHEN 'Upcoming' THEN r.date_time ASC
-              WHEN 'Ongoing' THEN r.date_time ASC 
-              WHEN 'Completed' THEN r.date_time DESC
+          CASE 
+              WHEN r.status = 'Upcoming' THEN r.date_time ASC
+              WHEN r.status = 'Ongoing' THEN r.date_time ASC 
+              WHEN r.status = 'Completed' THEN r.date_time DESC
               ELSE r.date_time ASC
           END
       LIMIT 5;
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
     const recentRides: RecentRideActivity[] = result.rows.map(row => ({
       id: row.id,
       name: row.name,
-      status: row.status as RecentRideActivity['status'],
+      status: row.status as RecentRideActivity['status'], // Cast to the defined type
       participantsCount: parseInt(row.participants_count, 10),
       startTime: row.status !== 'Completed' ? format(new Date(row.date_time), 'MMM dd, HH:mm') : undefined,
       captain: row.captain_name,
