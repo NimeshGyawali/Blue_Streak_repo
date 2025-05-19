@@ -1,24 +1,27 @@
 
 'use client';
 
-import type { User, Ride } from '@/types';
+import type { User, Ride, Achievement } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Award, Bike, CalendarDays, Edit3, MapPin, ShieldCheck, Star, Navigation, Hourglass, ShieldAlert } from 'lucide-react';
+import { Award, Bike, CalendarDays, Edit3, MapPin, ShieldCheck, Star, Navigation, Hourglass, ShieldAlert, Trophy, UserCheck, TrendingUp, ImageUp } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { Skeleton } from '../ui/skeleton';
 
-interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon?: React.ElementType;
-  dateEarned: Date;
-}
+// Map icon names from DB to Lucide components
+const iconMap: { [key: string]: React.ElementType } = {
+  Bike: Bike,
+  UserCheck: UserCheck,
+  CalendarDays: CalendarDays,
+  TrendingUp: TrendingUp,
+  ImageUp: ImageUp,
+  Trophy: Trophy,
+  Star: Star, // Default
+};
+
 
 interface UserProfileProps {
   user: User;
@@ -26,6 +29,8 @@ interface UserProfileProps {
   achievements: Achievement[];
   isLoadingRideHistory?: boolean;
   rideHistoryError?: string | null;
+  isLoadingAchievements?: boolean;
+  achievementsError?: string | null;
 }
 
 export function UserProfile({ 
@@ -33,7 +38,9 @@ export function UserProfile({
   rideHistory, 
   achievements,
   isLoadingRideHistory,
-  rideHistoryError 
+  rideHistoryError,
+  isLoadingAchievements,
+  achievementsError
 }: UserProfileProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -122,21 +129,37 @@ export function UserProfile({
             <CardDescription>Milestones you've reached in the community.</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Achievements are still using mock data */}
-            {achievements.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">No achievements unlocked yet. Keep riding!</p>
-            ) : (
+            {isLoadingAchievements && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {achievements.map((ach) => (
-                  <div key={ach.id} className="flex items-start gap-3 p-4 border rounded-lg bg-muted/30">
-                    {ach.icon ? <ach.icon size={36} className="text-accent mt-1" /> : <Star size={36} className="text-accent mt-1" />}
-                    <div>
-                      <h4 className="font-semibold">{ach.name}</h4>
-                      <p className="text-xs text-muted-foreground">{ach.description}</p>
-                      <p className="text-xs text-muted-foreground/80 mt-0.5">Earned: {format(new Date(ach.dateEarned), 'MMM dd, yyyy')}</p>
+                <Skeleton className="h-24 w-full rounded-lg" />
+                <Skeleton className="h-24 w-full rounded-lg" />
+              </div>
+            )}
+            {!isLoadingAchievements && achievementsError && (
+               <div className="text-center p-4 border border-destructive bg-destructive/10 rounded-md">
+                <ShieldAlert className="mx-auto h-8 w-8 text-destructive mb-2" />
+                <p className="text-sm font-medium text-destructive">Could not load achievements</p>
+                <p className="text-xs text-muted-foreground">{achievementsError}</p>
+              </div>
+            )}
+            {!isLoadingAchievements && !achievementsError && achievements.length === 0 && (
+              <p className="text-muted-foreground text-center py-4">No achievements unlocked yet. Keep riding!</p>
+            )}
+            {!isLoadingAchievements && !achievementsError && achievements.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {achievements.map((ach) => {
+                  const IconComponent = ach.icon_name ? iconMap[ach.icon_name] || Star : Star;
+                  return (
+                    <div key={ach.id} className="flex items-start gap-3 p-4 border rounded-lg bg-muted/30">
+                      <IconComponent size={36} className="text-accent mt-1 flex-shrink-0" />
+                      <div>
+                        <h4 className="font-semibold">{ach.name}</h4>
+                        <p className="text-xs text-muted-foreground">{ach.description}</p>
+                        <p className="text-xs text-muted-foreground/80 mt-0.5">Earned: {format(new Date(ach.date_earned), 'MMM dd, yyyy')}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

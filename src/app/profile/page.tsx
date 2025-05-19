@@ -3,20 +3,13 @@
 
 import { useEffect, useState } from 'react';
 import { UserProfile } from '@/components/profile/UserProfile';
-import type { User, Ride } from '@/types';
+import type { User, Ride, Achievement } from '@/types'; // Import Achievement type
 import { PageTitle } from '@/components/ui/PageTitle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ShieldAlert, UserCircle, Navigation, Award } from 'lucide-react'; // Added Navigation and Award
-
-// Mock achievements data (will be replaced by API calls later)
-const mockAchievements: { id: string; name: string; description: string; icon?: React.ElementType, dateEarned: Date }[] = [
-  { id: 'ach01', name: 'First Ride Completed', description: 'You completed your first Yamaha Blue Streaks ride!', dateEarned: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000), icon: Award },
-  { id: 'ach02', name: 'Road Captain', description: 'Successfully led a Micro-Ride.', dateEarned: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), icon: UserCircle },
-  { id: 'ach03', name: 'Weekend Warrior', description: 'Completed 3 rides in a single month.', dateEarned: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), icon: Navigation },
-];
+import { ShieldAlert, UserCircle, Navigation, Award } from 'lucide-react';
 
 function ProfileSkeleton() {
   return (
@@ -39,9 +32,9 @@ function ProfileSkeleton() {
             <Navigation size={22} className="text-primary" />
             <Skeleton className="h-6 w-1/3" /> {/* Title Skeleton */}
           </div>
-          <Skeleton className="h-10 w-full mb-2" /> {/* Item Skeleton */}
-          <Skeleton className="h-10 w-full mb-2" /> {/* Item Skeleton */}
-          <Skeleton className="h-10 w-full" />      {/* Item Skeleton */}
+          <Skeleton className="h-10 w-full mb-2" />
+          <Skeleton className="h-10 w-full mb-2" />
+          <Skeleton className="h-10 w-full" />
         </div>
         <div className="p-6 border rounded-lg shadow-lg">
            <div className="flex items-center gap-2 mb-4">
@@ -69,23 +62,33 @@ export default function ProfilePage() {
   const [isLoadingRideHistory, setIsLoadingRideHistory] = useState(true);
   const [rideHistoryError, setRideHistoryError] = useState<string | null>(null);
 
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [isLoadingAchievements, setIsLoadingAchievements] = useState(true);
+  const [achievementsError, setAchievementsError] = useState<string | null>(null);
+
   const { toast } = useToast();
 
   useEffect(() => {
-    async function fetchProfileAndHistory() {
-      if (authLoading) return; // Wait for auth context to load
+    async function fetchAllProfileData() {
+      if (authLoading) return; 
 
       if (!token) {
         setProfileError('Not authenticated. Please log in.');
         setRideHistoryError('Not authenticated. Please log in.');
+        setAchievementsError('Not authenticated. Please log in.');
         setIsLoadingProfile(false);
         setIsLoadingRideHistory(false);
+        setIsLoadingAchievements(false);
         return;
       }
 
+      // Reset errors
+      setProfileError(null);
+      setRideHistoryError(null);
+      setAchievementsError(null);
+
       // Fetch Profile Data
       setIsLoadingProfile(true);
-      setProfileError(null);
       try {
         const profileResponse = await fetch('/api/users/me', {
           headers: { 'Authorization': `Bearer ${token}` },
@@ -106,7 +109,6 @@ export default function ProfilePage() {
 
       // Fetch Ride History
       setIsLoadingRideHistory(true);
-      setRideHistoryError(null);
       try {
         const historyResponse = await fetch('/api/users/me/rides', {
           headers: { 'Authorization': `Bearer ${token}` },
@@ -124,9 +126,29 @@ export default function ProfilePage() {
       } finally {
         setIsLoadingRideHistory(false);
       }
+
+      // Fetch Achievements
+      setIsLoadingAchievements(true);
+      try {
+        const achievementsResponse = await fetch('/api/users/me/achievements', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!achievementsResponse.ok) {
+          const errorResult = await achievementsResponse.json();
+          throw new Error(errorResult.message || `Failed to fetch achievements (status: ${achievementsResponse.status})`);
+        }
+        const achievementsData: Achievement[] = await achievementsResponse.json();
+        setAchievements(achievementsData);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error fetching achievements.';
+        setAchievementsError(errorMessage);
+        toast({ variant: 'destructive', title: 'Error Fetching Achievements', description: errorMessage });
+      } finally {
+        setIsLoadingAchievements(false);
+      }
     }
 
-    fetchProfileAndHistory();
+    fetchAllProfileData();
   }, [token, toast, authLoading]);
 
   if (authLoading || isLoadingProfile) {
@@ -154,17 +176,17 @@ export default function ProfilePage() {
     );
   }
 
-  // Note: Ride history loading/error is handled within UserProfile component for now,
-  // or you can add specific loading indicators here for the ride history section.
   return (
     <div className="space-y-8">
       <PageTitle title="My Profile" description="View and manage your Yamaha Blue Streaks profile." />
       <UserProfile 
         user={profileData} 
         rideHistory={rideHistory} 
-        achievements={mockAchievements} // Achievements still mock
+        achievements={achievements}
         isLoadingRideHistory={isLoadingRideHistory}
         rideHistoryError={rideHistoryError}
+        isLoadingAchievements={isLoadingAchievements}
+        achievementsError={achievementsError}
       />
     </div>
   );
