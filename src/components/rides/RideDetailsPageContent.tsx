@@ -10,11 +10,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PhotoUploadForm } from './PhotoUploadForm';
-import { CalendarDays, Users, MapPin, UserCircle, MessageCircle, Image as ImageIcon, Route, HelpCircle, UploadCloud } from 'lucide-react';
+import { CalendarDays, Users, MapPin, UserCircle, MessageCircle, Image as ImageIcon, Route, HelpCircle, UploadCloud, LogIn, LogOutIcon, UserPlus, UserMinus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface RideDetailsPageContentProps {
   ride: Ride;
+  initialParticipantIds?: string[]; // Pass initial participant IDs to determine join/leave state
 }
 
 // Mock Chat Message component
@@ -34,17 +39,88 @@ const ChatMessage = ({ user, message, time }: { user: User, message: string, tim
   </div>
 );
 
-export function RideDetailsPageContent({ ride }: RideDetailsPageContentProps) {
+export function RideDetailsPageContent({ ride: initialRide }: RideDetailsPageContentProps) {
+  const { user, token, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+  const [ride, setRide] = useState<Ride>(initialRide);
+  const [isJoiningOrLeaving, setIsJoiningOrLeaving] = useState(false);
+  const [isCurrentUserParticipant, setIsCurrentUserParticipant] = useState(false);
+
+  useEffect(() => {
+    setRide(initialRide); // Update ride state if initialRide prop changes
+    if (user && initialRide.participants) {
+      setIsCurrentUserParticipant(initialRide.participants.some(p => p.id === user.id));
+    } else {
+      setIsCurrentUserParticipant(false);
+    }
+  }, [initialRide, user]);
+
+
+  const handleJoinOrLeaveRide = async (action: 'join' | 'leave') => {
+    if (!user || !token) {
+      toast({ variant: 'destructive', title: 'Authentication Required', description: 'Please log in to join or leave rides.' });
+      router.push('/auth/login?redirect=/rides/' + ride.id);
+      return;
+    }
+    if (isJoiningOrLeaving) return;
+
+    setIsJoiningOrLeaving(true);
+    const endpoint = `/api/rides/${ride.id}/${action}`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to ${action} ride.`);
+      }
+
+      toast({ title: `Successfully ${action === 'join' ? 'Joined' : 'Left'} Ride`, description: result.message });
+      
+      // Optimistically update UI or refetch ride details for updated participant list
+      // For simplicity, we'll update local state. A full refetch might be better for consistency.
+      if (action === 'join') {
+        setIsCurrentUserParticipant(true);
+        // Add current user to participants list if not already there (for UI update)
+        setRide(prevRide => ({
+          ...prevRide,
+          participants: prevRide.participants.find(p => p.id === user.id) ? prevRide.participants : [...prevRide.participants, user]
+        }));
+      } else {
+        setIsCurrentUserParticipant(false);
+        // Remove current user from participants list (for UI update)
+        setRide(prevRide => ({
+          ...prevRide,
+          participants: prevRide.participants.filter(p => p.id !== user.id)
+        }));
+      }
+      // Note: For a truly robust update of participant count and list, re-fetching ride data might be preferable.
+      // router.refresh(); // This could work if page is server component or refetches on navigation
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : `An unknown error occurred while trying to ${action} the ride.`;
+      toast({ variant: 'destructive', title: `${action.charAt(0).toUpperCase() + action.slice(1)} Ride Failed`, description: errorMessage });
+    } finally {
+      setIsJoiningOrLeaving(false);
+    }
+  };
+
+
   const mockChatMessages = [
     { user: ride.captain, message: "Hey everyone, excited for the ride!", time: "10:00 AM" },
-    { user: ride.participants[0] || {id:'p1', name:'Rider Tom'}, message: "Me too! Weather looks great.", time: "10:05 AM" },
+    { user: ride.participants[0] || {id:'p1', name:'Rider Tom', avatarUrl: `https://placehold.co/40x40.png`}, message: "Me too! Weather looks great.", time: "10:05 AM" },
     { user: ride.captain, message: "Remember to bring water and check your tire pressure.", time: "10:10 AM" },
   ];
 
-  const mockPhotos = ride.photos || [
-    { url: 'https://placehold.co/300x200.png', uploader: ride.captain, caption: 'Getting ready!', dataAiHint: 'motorcycle group' },
-    { url: 'https://placehold.co/300x200.png', uploader: ride.participants[0] || {id:'p1', name:'Rider Tom'}, caption: 'Scenic view from the pitstop.', dataAiHint: 'road landscape' },
-    { url: 'https://placehold.co/300x200.png', uploader: ride.participants[1] || {id:'p2', name:'Rider Jane'}, caption: 'Fun times!', dataAiHint: 'happy people' },
+  const galleryPhotos = ride.photos?.length ? ride.photos : [
+    { id: 'ph1', url: ride.thumbnailUrl || 'https://placehold.co/300x200.png', uploader: ride.captain, caption: 'Ride Thumbnail (Placeholder)', dataAiHint: ride.photoHints || 'motorcycle group' },
   ];
 
 
@@ -110,14 +186,45 @@ export function RideDetailsPageContent({ ride }: RideDetailsPageContentProps) {
           </div>
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold text-foreground">Ride Actions</h2>
-            {ride.status === 'Upcoming' && (
-              <Button className="w-full bg-green-600 hover:bg-green-700">Join Ride</Button>
+            {!authLoading && user && ride.status === 'Upcoming' && (
+              isCurrentUserParticipant ? (
+                <Button 
+                  className="w-full" 
+                  variant="outline"
+                  onClick={() => handleJoinOrLeaveRide('leave')}
+                  disabled={isJoiningOrLeaving}
+                >
+                  <UserMinus className="mr-2 h-4 w-4" /> {isJoiningOrLeaving ? 'Leaving...' : 'Leave Ride'}
+                </Button>
+              ) : (
+                <Button 
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  onClick={() => handleJoinOrLeaveRide('join')}
+                  disabled={isJoiningOrLeaving}
+                >
+                   <UserPlus className="mr-2 h-4 w-4" /> {isJoiningOrLeaving ? 'Joining...' : 'Join Ride'}
+                </Button>
+              )
+            )}
+             {!authLoading && !user && ride.status === 'Upcoming' && (
+                <Button className="w-full" onClick={() => router.push('/auth/login?redirect=/rides/' + ride.id)}>
+                    <LogIn className="mr-2 h-4 w-4" /> Login to Join
+                </Button>
             )}
             {ride.status === 'Ongoing' && (
               <Button className="w-full" disabled>Ride In Progress</Button>
             )}
             {ride.status === 'Completed' && (
               <Button className="w-full" variant="secondary" disabled>Ride Completed</Button>
+            )}
+             {ride.status === 'Cancelled' && (
+              <Button className="w-full" variant="destructive" disabled>Ride Cancelled</Button>
+            )}
+             {ride.status === 'Pending Approval' && (
+              <Button className="w-full" variant="outline" disabled>Pending Approval</Button>
+            )}
+             {ride.status === 'Rejected' && (
+              <Button className="w-full" variant="destructive" disabled>Ride Rejected</Button>
             )}
             <Button variant="outline" className="w-full flex items-center gap-2">
               <HelpCircle size={18} /> Contact Captain/HQ
@@ -128,7 +235,7 @@ export function RideDetailsPageContent({ ride }: RideDetailsPageContentProps) {
 
       <Tabs defaultValue="participants" className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
-          <TabsTrigger value="participants" className="flex items-center gap-1"><Users size={16}/>Participants</TabsTrigger>
+          <TabsTrigger value="participants" className="flex items-center gap-1"><Users size={16}/>Participants ({ride.participants.length + 1})</TabsTrigger> {/* +1 for captain */}
           <TabsTrigger value="chat" className="flex items-center gap-1"><MessageCircle size={16}/>Group Chat</TabsTrigger>
           <TabsTrigger value="gallery" className="flex items-center gap-1"><ImageIcon size={16}/>Photo Gallery</TabsTrigger>
           <TabsTrigger value="upload" className="flex items-center gap-1"><UploadCloud size={16}/>Upload Photos</TabsTrigger>
@@ -137,21 +244,24 @@ export function RideDetailsPageContent({ ride }: RideDetailsPageContentProps) {
         <TabsContent value="participants">
           <Card>
             <CardHeader>
-              <CardTitle>Participants ({ride.participants.length})</CardTitle>
+              <CardTitle>Participants ({ride.participants.length + 1})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[ride.captain, ...ride.participants].map((user, index) => (
-                <div key={user.id} className="flex items-center gap-3 p-3 bg-muted/20 hover:bg-muted/50 rounded-md transition-colors">
+              {[ride.captain, ...ride.participants].map((pUser, index) => (
+                <div key={pUser.id || `participant-${index}`} className="flex items-center gap-3 p-3 bg-muted/20 hover:bg-muted/50 rounded-md transition-colors">
                   <Avatar>
-                    <AvatarImage src={user.avatarUrl || `https://placehold.co/40x40.png`} alt={user.name} data-ai-hint="person avatar" />
-                    <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={pUser.avatarUrl || `https://placehold.co/40x40.png`} alt={pUser.name} data-ai-hint="person avatar" />
+                    <AvatarFallback>{pUser.name?.charAt(0) || 'U'}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium text-foreground">{user.name} {index === 0 && <Badge variant="secondary" className="ml-2">Captain</Badge>}</p>
-                    {/* <p className="text-xs text-muted-foreground">{user.bikeModel || 'Yamaha Rider'}</p> */}
+                    <p className="font-medium text-foreground">{pUser.name} {pUser.id === ride.captain.id && <Badge variant="secondary" className="ml-2">Captain</Badge>}</p>
+                    {pUser.bikeModel && <p className="text-xs text-muted-foreground">{pUser.bikeModel}</p>}
                   </div>
                 </div>
               ))}
+               {ride.participants.length === 0 && ride.captain.id !== user?.id && (
+                <p className="text-muted-foreground text-center py-4">Be the first to join this ride!</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -182,12 +292,12 @@ export function RideDetailsPageContent({ ride }: RideDetailsPageContentProps) {
               <CardTitle>Photo Gallery</CardTitle>
             </CardHeader>
             <CardContent>
-              {mockPhotos.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No photos uploaded yet for this ride.</p>
+              {galleryPhotos.length === 0 || (galleryPhotos.length === 1 && galleryPhotos[0].caption?.includes('Placeholder')) ? (
+                <p className="text-center text-muted-foreground py-4">No photos uploaded yet for this ride. Be the first to share!</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {mockPhotos.map((photo, index) => (
-                    <div key={index} className="group relative aspect-square overflow-hidden rounded-lg shadow-md">
+                  {galleryPhotos.map((photo, index) => (
+                    <div key={photo.id || `gallery-photo-${index}`} className="group relative aspect-square overflow-hidden rounded-lg shadow-md">
                       <Image src={photo.url} alt={photo.caption || `Ride photo ${index + 1}`} fill={true} className="object-cover" data-ai-hint={photo.dataAiHint || "motorcycle image"} />
                       {photo.caption && (
                         <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-2 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity">

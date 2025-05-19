@@ -3,11 +3,13 @@
 
 import { useEffect, useState } from 'react';
 import { RideDetailsPageContent } from '@/components/rides/RideDetailsPageContent';
-import type { Ride } from '@/types';
-import { notFound, useParams } from 'next/navigation'; // Import useParams
+import type { Ride, User } from '@/types';
+import { notFound, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button'; // Added Button for Try Again
+import { useRouter } from 'next/navigation'; // Added useRouter for Try Again
 
 // Component to display loading skeleton for RideDetailsPageContent
 function RideDetailsSkeleton() {
@@ -44,102 +46,79 @@ function RideDetailsSkeleton() {
 }
 
 export default function RideDetailPage() {
-  const params = useParams(); // Get params using hook
+  const params = useParams(); 
   const rideId = typeof params.id === 'string' ? params.id : undefined;
   const [ride, setRide] = useState<Ride | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
-  useEffect(() => {
+  async function fetchRideDetails() {
     if (!rideId) {
-      // This case should ideally be handled by routing or a notFound() call earlier
-      // if the ID is not present or invalid before reaching this page.
-      // For now, if ID is somehow undefined, treat as not found.
       setIsLoading(false);
       setError("Ride ID is missing.");
+      notFound(); // Call notFound if rideId is definitively missing
       return;
     }
 
-    async function fetchRideDetails() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/api/rides/${rideId}`);
-        if (response.status === 404) {
-          // Call notFound directly if API confirms resource doesn't exist
-          notFound(); 
-          return;
-        }
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to fetch ride details.');
-        }
-        const data: Ride = await response.json();
-        setRide(data);
-        // Dynamically set metadata (title) - This is client-side, for server-side use generateMetadata
-        document.title = `${data.name} | Yamaha Blue Streaks`;
-
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-        setError(errorMessage);
-        // Only toast if it's not a "not found" error already handled by redirect
-        if (errorMessage !== "Ride not found.") {
-            toast({
-            variant: 'destructive',
-            title: 'Error Fetching Ride Details',
-            description: errorMessage,
-            });
-        }
-      } finally {
-        setIsLoading(false);
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/rides/${rideId}`);
+      if (response.status === 404) {
+        notFound(); 
+        return;
       }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch ride details.');
+      }
+      const data: Ride = await response.json();
+      setRide(data);
+      // Dynamically set metadata (title) - This is client-side
+      document.title = `${data.name} | Yamaha Blue Streaks`;
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      setError(errorMessage);
+      if (!errorMessage.toLowerCase().includes("not found")) { // Avoid double toasting if notFound was called
+          toast({
+          variant: 'destructive',
+          title: 'Error Fetching Ride Details',
+          description: errorMessage,
+          });
+      }
+    } finally {
+      setIsLoading(false);
     }
+  }
+
+  useEffect(() => {
     fetchRideDetails();
-  }, [rideId, toast]);
+  }, [rideId]); // Removed toast from dependencies as fetchRideDetails is now standalone
 
   if (isLoading) {
     return <RideDetailsSkeleton />;
   }
 
   if (error) {
-    // If notFound() was called, this part won't be reached.
+    // If notFound() was called, this part might not be reached or might show after a brief flash.
     // This handles other types of errors.
     return (
       <div className="text-center py-10">
         <PageTitle title="Error" description={`Could not load ride details: ${error}`} />
+        <Button onClick={() => fetchRideDetails()} variant="outline" className="mt-4 mr-2">Try Again</Button>
         <Button onClick={() => router.push('/rides')} variant="outline" className="mt-4">Back to Rides</Button>
       </div>
     );
   }
   
-  // If ride is null and no error, it implies notFound() should have been called or ID was invalid.
-  // The notFound() call within fetchRideDetails should handle this.
-  // However, as a fallback, if ride is still null here for some reason:
   if (!ride) {
-      notFound(); // Ensure notFound is called if ride is null post-loading
+    // This ensures notFound is called if ride is null after loading and no error was set that implies notFound.
+    // It's a safeguard.
+    notFound();
   }
-
 
   return <RideDetailsPageContent ride={ride} />;
 }
-
-// Note: generateMetadata should be kept if you want server-side metadata generation.
-// For client-side rendering as above, dynamic title update is handled in useEffect.
-// If this page is purely client-rendered, generateMetadata might not be as effective
-// without further adjustments for client-side data fetching that can feed into it.
-// For a truly dynamic server-rendered page, data fetching for metadata should happen in generateMetadata.
-
-// Example: Keep generateMetadata if you still pre-render some aspects or for SEO.
-// You would need a server-side version of getRideDetails for this to work optimally.
-// async function getRideDetailsServer(id: string): Promise<Ride | null> { ... }
-// export async function generateMetadata({ params }: { params: { id: string } }) {
-//   const ride = await getRideDetailsServer(params.id); // Use a server-side fetch
-//   if (!ride) {
-//     return { title: 'Ride Not Found' }
-//   }
-//   return {
-//     title: `${ride.name} | Yamaha Blue Streaks`,
-//     description: ride.description || `Details for the ${ride.type} ride: ${ride.name}.`,
-//   }
-// }
