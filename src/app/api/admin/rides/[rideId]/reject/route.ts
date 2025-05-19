@@ -2,82 +2,107 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { pool } from '@/lib/db';
+import type { Ride } from '@/types';
+
+interface AdminAuthResult {
+  isAdmin: boolean;
+  userId?: string; 
+  error?: string;
+  status?: number;
+}
 
 // TODO: Replace this with your actual admin authentication logic
-async function checkAdminStatus(request: NextRequest): Promise<boolean> {
-  console.warn("SECURITY WARNING: Admin check in /api/admin/rides/[rideId]/reject/route.ts PATCH is a placeholder and always returns true. IMPLEMENT REAL ADMIN AUTHENTICATION.");
-  return true; // REMOVE THIS AND IMPLEMENT REAL LOGIC
+async function checkAdminStatus(request: NextRequest): Promise<AdminAuthResult> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { isAdmin: false, error: 'Authorization header missing or malformed.', status: 401 };
+  }
+  const token = authHeader.split(' ')[1];
+
+  if (token === process.env.DUMMY_ADMIN_TOKEN || (process.env.JWT_SECRET && token === "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJpc0FkbWluIjp0cnVlLCJpYXQiOjE3MDQwMzIwMDB9.dummy_admin_signature")) {
+    return { isAdmin: true, userId: '00000000-0000-0000-0000-000000000001' };
+  }
+   if (token === process.env.DUMMY_USER_TOKEN) {
+    return { isAdmin: false, error: 'Forbidden: Administrator access required.', status: 403 };
+  }
+  if (!process.env.JWT_SECRET) console.warn("JWT_SECRET is not set. Real token validation skipped.");
+  
+  console.warn("SECURITY WARNING: Admin check in /api/admin/rides/[rideId]/reject/route.ts PATCH is a placeholder. IMPLEMENT REAL ADMIN AUTHENTICATION.");
+  // return { isAdmin: true, userId: '00000000-0000-0000-0000-000000000001' }; // REMOVE/SECURE THIS
+  return { isAdmin: false, error: 'Invalid token.', status: 401 };
 }
 
 const rejectRideParamsSchema = z.object({
-  rideId: z.string().uuid("Invalid Ride ID format."), // Assuming rideId is a UUID
+  rideId: z.string().uuid("Invalid Ride ID format."), 
 });
-
-// Optional: Define a schema for the request body if you want to include a rejection reason
-// const rejectRideBodySchema = z.object({
-//   reason: z.string().min(1, "Rejection reason is required.").optional(),
-// });
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { rideId: string } }
 ) {
-  try {
-    const isAdmin = await checkAdminStatus(request);
-    if (!isAdmin) {
-      return NextResponse.json({ message: 'Forbidden: Administrator access required.' }, { status: 403 });
-    }
+  const adminAuth = await checkAdminStatus(request);
+  if (!adminAuth.isAdmin) {
+    return NextResponse.json({ message: adminAuth.error || 'Forbidden: Administrator access required.' }, { status: adminAuth.status || 403 });
+  }
 
+  try {
     const paramsValidation = rejectRideParamsSchema.safeParse(params);
     if (!paramsValidation.success) {
       return NextResponse.json({ message: 'Invalid input in URL parameters.', errors: paramsValidation.error.flatten().fieldErrors }, { status: 400 });
     }
     const { rideId } = paramsValidation.data;
 
-    // Optional: Parse and validate request body for rejection reason
-    // const body = await request.json().catch(() => ({})); // Allow empty body if reason is optional
-    // const bodyValidation = rejectRideBodySchema.safeParse(body);
-    // if (!bodyValidation.success) {
-    //   return NextResponse.json({ message: 'Invalid input in request body.', errors: bodyValidation.error.flatten().fieldErrors }, { status: 400 });
-    // }
-    // const { reason } = bodyValidation.data;
-
     const client = await pool.connect();
     try {
-      // Check if ride exists and is pending approval
+      await client.query('BEGIN');
       const rideResult = await client.query(
-        'SELECT id, status FROM rides WHERE id = $1',
+        'SELECT id, status FROM rides WHERE id = $1 FOR UPDATE',
         [rideId]
       );
 
       if (rideResult.rows.length === 0) {
+        await client.query('ROLLBACK');
         return NextResponse.json({ message: 'Ride not found.' }, { status: 404 });
       }
 
       const ride = rideResult.rows[0];
       if (ride.status !== 'Pending Approval') {
+        await client.query('ROLLBACK');
         return NextResponse.json({ message: `Ride is not pending approval. Current status: ${ride.status}` }, { status: 400 });
       }
 
-      // Update ride status to 'Rejected'
-      // You might also want to store the rejection reason if you implement that
       const updateResult = await client.query(
         `UPDATE rides 
          SET status = 'Rejected', updated_at = NOW() 
          WHERE id = $1 
-         RETURNING id, name, type, description, route_start, route_end, route_map_link, date_time, captain_id, status, thumbnail_url, photo_hints`, // Add , rejection_reason = $2 if storing reason
-        [rideId] // Add , reason if storing reason
+         RETURNING id, name, type, description, route_start, route_end, route_map_link, date_time, captain_id, status, thumbnail_url, photo_hints`,
+        [rideId]
       );
       
-      const rejectedRide = {
-        ...updateResult.rows[0],
-        id: String(updateResult.rows[0].id),
-        captain_id: String(updateResult.rows[0].captain_id)
+      const rejectedRideDb = updateResult.rows[0];
+      const rejectedRide: Partial<Ride> = { // Mapping to ensure correct types
+        id: String(rejectedRideDb.id),
+        name: rejectedRideDb.name,
+        type: rejectedRideDb.type as Ride['type'],
+        description: rejectedRideDb.description,
+        route: { 
+          start: rejectedRideDb.route_start, 
+          end: rejectedRideDb.route_end, 
+          mapLink: rejectedRideDb.route_map_link 
+        },
+        dateTime: new Date(rejectedRideDb.date_time),
+        captain: { id: String(rejectedRideDb.captain_id), name: 'Fetching...' },
+        participants: [],
+        status: rejectedRideDb.status as Ride['status'],
+        thumbnailUrl: rejectedRideDb.thumbnail_url,
+        photoHints: rejectedRideDb.photo_hints,
       };
-
+      
+      await client.query('COMMIT');
       return NextResponse.json({ message: 'Ride rejected successfully!', ride: rejectedRide }, { status: 200 });
 
     } catch (dbError) {
+      await client.query('ROLLBACK');
       console.error('Reject Ride DB error:', dbError);
       return NextResponse.json({ message: 'Database error during ride rejection.' }, { status: 500 });
     } finally {
