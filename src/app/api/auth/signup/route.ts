@@ -1,7 +1,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { pool } from '@/lib/db'; 
+import { pool } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
 const signupSchemaServer = z.object({
@@ -37,20 +37,20 @@ export async function POST(request: NextRequest) {
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
       // Insert the new user into the database
-      // Default is_captain and is_verified to false
+      // Default is_captain, is_verified, and is_admin to false
       const newUserResult = await client.query(
-        `INSERT INTO users (name, email, password_hash, city, bike_model, vin, is_captain, is_verified, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) 
-         RETURNING id, name, email, city, bike_model, vin, is_captain, is_verified, avatar_url`,
-        [name, email.toLowerCase(), hashedPassword, city, bikeModel, vin, false, false]
+        `INSERT INTO users (name, email, password_hash, city, bike_model, vin, is_captain, is_verified, is_admin, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+         RETURNING id, name, email, city, bike_model, vin, is_captain, is_verified, is_admin, avatar_url`,
+        [name, email.toLowerCase(), hashedPassword, city, bikeModel, vin, false, false, false] // is_admin defaults to false
       );
       const newUser = newUserResult.rows[0];
 
       // TODO: Generate a session/token (e.g., JWT) and include it in the response
       // For now, just returning the user
-      return NextResponse.json({ 
-        message: 'Signup successful!', 
-        user: newUser, 
+      return NextResponse.json({
+        message: 'Signup successful!',
+        user: newUser,
         // token: 'YOUR_GENERATED_JWT_TOKEN' // Placeholder for token
       }, { status: 201 });
 

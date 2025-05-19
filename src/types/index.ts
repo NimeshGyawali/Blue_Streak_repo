@@ -1,3 +1,4 @@
+
 export interface User {
   id: string;
   name: string;
@@ -6,6 +7,8 @@ export interface User {
   bikeModel?: string;
   vin?: string;
   isCaptain?: boolean;
+  is_admin?: boolean; // Added for admin status
+  is_verified?: boolean; // Added for verification status
   avatarUrl?: string;
   // rideHistory: Ride[]; // Simplified for now
   // achievements: string[]; // Simplified for now

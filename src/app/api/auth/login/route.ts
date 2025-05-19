@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     try {
       // Find the user by email
       const result = await client.query(
-        'SELECT id, name, email, password_hash, city, bike_model, vin, is_captain, is_verified, avatar_url FROM users WHERE email = $1', 
+        'SELECT id, name, email, password_hash, city, bike_model, vin, is_captain, is_verified, is_admin, avatar_url FROM users WHERE email = $1',
         [email.toLowerCase()]
       );
       const user = result.rows[0];
@@ -45,11 +45,11 @@ export async function POST(request: NextRequest) {
       // }
 
       // If credentials are valid, prepare user data (excluding password)
-      // TODO: Generate a session/token (e.g., JWT)
+      // TODO: Generate a session/token (e.g., JWT) that includes user.id and user.is_admin
       const { password_hash, ...userWithoutPassword } = user;
-      return NextResponse.json({ 
-        message: 'Login successful!', 
-        user: userWithoutPassword, 
+      return NextResponse.json({
+        message: 'Login successful!',
+        user: userWithoutPassword,
         // token: 'YOUR_GENERATED_JWT_TOKEN' // Placeholder for token
       }, { status: 200 });
 

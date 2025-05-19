@@ -12,7 +12,11 @@ async function checkAdminStatus(request: NextRequest): Promise<boolean> {
   // const token = request.headers.get('Authorization')?.split(' ')[1];
   // if (!token) return false;
   // try {
-  //   const decoded = verifyToken(token); // Your JWT verification function
+  //   const decoded = verifyToken(token); // Your JWT verification function (e.g., jwt.verify)
+  //   // Assuming decoded token has userId and potentially an is_admin flag or roles
+  //   if (decoded.is_admin) return true; // If is_admin is directly in token
+  //
+  //   // Or, query DB if token only has userId:
   //   const client = await pool.connect();
   //   try {
   //     const userResult = await client.query('SELECT is_admin FROM users WHERE id = $1', [decoded.userId]);
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
     const client = await pool.connect();
     try {
       const result = await client.query(
-        'SELECT id, name, email, city, bike_model, vin, is_verified, is_captain, created_at FROM users ORDER BY created_at DESC'
+        'SELECT id, name, email, city, bike_model, vin, is_verified, is_captain, is_admin, created_at FROM users ORDER BY created_at DESC'
       );
       
       const users = result.rows.map(user => ({

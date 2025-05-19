@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { CheckCircle, XCircle, UserCheck, Hourglass, ShieldAlert } from 'lucide-react';
+import { CheckCircle, XCircle, UserCheck, Hourglass, ShieldAlert, ShieldCheck as AdminIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface AdminUser {
@@ -21,6 +21,7 @@ interface AdminUser {
   vin: string | null;
   is_verified: boolean;
   is_captain: boolean;
+  is_admin: boolean; // Added is_admin
   created_at: string;
 }
 
@@ -149,7 +150,7 @@ export default function UserManagementPage() {
         <CardHeader>
           <CardTitle>User List ({users.length})</CardTitle>
           <CardDescription>
-            View, search, and manage all registered users. Use the actions to verify pending users.
+            View, search, and manage all registered users. Use the actions to verify pending users. Admin status is provisioned manually.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -163,9 +164,9 @@ export default function UserManagementPage() {
                   <TableHead>Email</TableHead>
                   <TableHead className="hidden md:table-cell">City</TableHead>
                   <TableHead className="hidden lg:table-cell">Bike Model</TableHead>
-                  <TableHead className="hidden lg:table-cell">VIN (Partial)</TableHead>
                   <TableHead className="hidden md:table-cell text-center">Registered</TableHead>
                   <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-center">Admin</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -176,9 +177,6 @@ export default function UserManagementPage() {
                     <TableCell>{user.email}</TableCell>
                     <TableCell className="hidden md:table-cell">{user.city || 'N/A'}</TableCell>
                     <TableCell className="hidden lg:table-cell">{user.bike_model || 'N/A'}</TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {user.vin ? `${user.vin.substring(0, 4)}...${user.vin.substring(user.vin.length - 4)}` : 'N/A'}
-                    </TableCell>
                     <TableCell className="hidden md:table-cell text-center text-xs">
                       {format(new Date(user.created_at), 'MMM dd, yyyy')}
                     </TableCell>
@@ -190,6 +188,17 @@ export default function UserManagementPage() {
                       ) : (
                         <Badge variant="secondary" className="bg-yellow-500 hover:bg-yellow-600 text-yellow-foreground">
                           <Hourglass size={14} className="mr-1" /> Pending
+                        </Badge>
+                      )}
+                    </TableCell>
+                     <TableCell className="text-center">
+                      {user.is_admin ? (
+                        <Badge variant="destructive" className="bg-blue-600 hover:bg-blue-700">
+                          <AdminIcon size={14} className="mr-1" /> Admin
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">
+                           User
                         </Badge>
                       )}
                     </TableCell>
