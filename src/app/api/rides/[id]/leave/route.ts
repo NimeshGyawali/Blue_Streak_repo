@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { pool } from '@/lib/db';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../../../../../lib/authConstants'; // Adjusted path
+import { JWT_SECRET } from '@/lib/authConstants';
 
 interface DecodedToken {
   userId: string;
@@ -34,12 +34,12 @@ async function getAuthenticatedUserIdFromToken(request: NextRequest): Promise<st
 }
 
 const rideParamsSchema = z.object({
-  id: z.string().uuid("Invalid Ride ID format."), // Changed from rideId to id
+  id: z.string().uuid("Invalid Ride ID format."),
 });
 
-export async function POST( // Using POST for simplicity, could also be DELETE
+export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } } // Changed from rideId to id
+  { params }: { params: { id: string } } // Ensure this expects params.id
 ) {
   const userId = await getAuthenticatedUserIdFromToken(request);
   if (!userId) {
@@ -50,17 +50,15 @@ export async function POST( // Using POST for simplicity, could also be DELETE
   if (!paramsValidation.success) {
     return NextResponse.json({ message: 'Invalid Ride ID.', errors: paramsValidation.error.flatten().fieldErrors }, { status: 400 });
   }
-  const { id: rideId } = paramsValidation.data; // Keep variable name rideId internally for clarity if preferred
+  const { id: rideId } = paramsValidation.data; // Use rideId internally after validating params.id
 
   const client = await pool.connect();
   try {
-    // Check if ride exists (user can only leave if ride exists)
     const rideResult = await client.query('SELECT id FROM rides WHERE id = $1', [rideId]);
     if (rideResult.rows.length === 0) {
       return NextResponse.json({ message: 'Ride not found.' }, { status: 404 });
     }
 
-    // Remove user from participants
     const deleteResult = await client.query(
       'DELETE FROM ride_participants WHERE ride_id = $1 AND user_id = $2 RETURNING user_id',
       [rideId, userId]

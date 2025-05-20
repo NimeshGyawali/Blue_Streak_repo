@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { pool } from '@/lib/db';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../../../../../lib/authConstants'; // Adjusted path
+import { JWT_SECRET } from '@/lib/authConstants';
 
 interface DecodedToken {
   userId: string;
@@ -34,12 +34,12 @@ async function getAuthenticatedUserIdFromToken(request: NextRequest): Promise<st
 }
 
 const rideParamsSchema = z.object({
-  id: z.string().uuid("Invalid Ride ID format."), // Changed from rideId to id
+  id: z.string().uuid("Invalid Ride ID format."),
 });
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } } // Changed from rideId to id
+  { params }: { params: { id: string } } // Ensure this expects params.id
 ) {
   const userId = await getAuthenticatedUserIdFromToken(request);
   if (!userId) {
@@ -50,11 +50,10 @@ export async function POST(
   if (!paramsValidation.success) {
     return NextResponse.json({ message: 'Invalid Ride ID.', errors: paramsValidation.error.flatten().fieldErrors }, { status: 400 });
   }
-  const { id: rideId } = paramsValidation.data; // Keep variable name rideId internally for clarity if preferred
+  const { id: rideId } = paramsValidation.data; // Use rideId internally after validating params.id
 
   const client = await pool.connect();
   try {
-    // Check if ride exists and is upcoming
     const rideResult = await client.query(
       "SELECT id, status FROM rides WHERE id = $1 AND status = 'Upcoming'",
       [rideId]
@@ -63,7 +62,6 @@ export async function POST(
       return NextResponse.json({ message: 'Ride not found or not available for joining.' }, { status: 404 });
     }
 
-    // Check if user is already a participant
     const existingParticipantResult = await client.query(
       'SELECT user_id FROM ride_participants WHERE ride_id = $1 AND user_id = $2',
       [rideId, userId]
@@ -72,7 +70,6 @@ export async function POST(
       return NextResponse.json({ message: 'You have already joined this ride.' }, { status: 409 });
     }
 
-    // Add user to participants
     await client.query(
       'INSERT INTO ride_participants (ride_id, user_id, joined_at) VALUES ($1, $2, NOW())',
       [rideId, userId]

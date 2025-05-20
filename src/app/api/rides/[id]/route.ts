@@ -5,23 +5,22 @@ import { pool } from '@/lib/db';
 import type { Ride, User } from '@/types';
 
 const paramsSchema = z.object({
-  id: z.string().uuid("Invalid Ride ID format."), // Assuming ride ID is UUID
+  id: z.string().uuid("Invalid Ride ID format."),
 });
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } } // Ensure this expects params.id
 ) {
   try {
     const validation = paramsSchema.safeParse(params);
     if (!validation.success) {
       return NextResponse.json({ message: 'Invalid Ride ID.', errors: validation.error.flatten().fieldErrors }, { status: 400 });
     }
-    const { id: rideId } = validation.data;
+    const { id: rideId } = validation.data; // Use rideId internally after validating params.id
 
     const client = await pool.connect();
     try {
-      // Query to fetch ride details
       const rideQuery = `
         SELECT 
           r.id, 
@@ -52,9 +51,6 @@ export async function GET(
       }
       const rideData = rideResult.rows[0];
 
-      // Query to fetch participants
-      // Note: In a real app, you might want to limit the number of participants returned directly
-      // or implement pagination if a ride can have many participants.
       const participantsQuery = `
         SELECT 
           u.id::text, 
@@ -73,8 +69,6 @@ export async function GET(
         bikeModel: p.bike_model,
       }));
       
-      // Query to fetch photos (simplified, assuming a 'ride_photos' table)
-      // This is a placeholder, adjust to your actual photos table structure
       const photosQuery = `
         SELECT 
           rp.id::text, 
@@ -90,15 +84,13 @@ export async function GET(
         WHERE rp.ride_id = $1
         ORDER BY rp.uploaded_at DESC;
       `;
-       // Placeholder for photos, implement actual query if ride_photos table exists
-      const photosResult = await client.query(photosQuery, [rideId]).catch(() => ({ rows: [] })); // Gracefully handle if table doesn't exist yet
+      const photosResult = await client.query(photosQuery, [rideId]).catch(() => ({ rows: [] }));
       const photos = photosResult.rows.map(p => ({
         url: p.url,
         uploader: p.uploader as User,
         caption: p.caption,
         dataAiHint: p.data_ai_hint,
       }));
-
 
       const ride: Ride = {
         id: String(rideData.id),

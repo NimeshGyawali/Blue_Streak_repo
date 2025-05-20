@@ -3,13 +3,13 @@
 
 import { useEffect, useState } from 'react';
 import { RideDetailsPageContent } from '@/components/rides/RideDetailsPageContent';
-import type { Ride, User } from '@/types';
+import type { Ride } from '@/types';
 import { notFound, useParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button'; // Added Button for Try Again
-import { useRouter } from 'next/navigation'; // Added useRouter for Try Again
+import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 // Component to display loading skeleton for RideDetailsPageContent
 function RideDetailsSkeleton() {
@@ -46,8 +46,8 @@ function RideDetailsSkeleton() {
 }
 
 export default function RideDetailPage() {
-  const params = useParams(); 
-  const rideId = typeof params.id === 'string' ? params.id : undefined;
+  const params = useParams();
+  const rideId = typeof params.id === 'string' ? params.id : undefined; // Ensure using params.id
   const [ride, setRide] = useState<Ride | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,16 +58,16 @@ export default function RideDetailPage() {
     if (!rideId) {
       setIsLoading(false);
       setError("Ride ID is missing.");
-      notFound(); // Call notFound if rideId is definitively missing
+      notFound();
       return;
     }
 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/rides/${rideId}`);
+      const response = await fetch(`/api/rides/${rideId}`); // Uses rideId from params.id
       if (response.status === 404) {
-        notFound(); 
+        notFound();
         return;
       }
       if (!response.ok) {
@@ -76,18 +76,18 @@ export default function RideDetailPage() {
       }
       const data: Ride = await response.json();
       setRide(data);
-      // Dynamically set metadata (title) - This is client-side
-      document.title = `${data.name} | Yamaha Blue Streaks`;
-
+      if (typeof window !== 'undefined') {
+        document.title = `${data.name} | Yamaha Blue Streaks`;
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       setError(errorMessage);
-      if (!errorMessage.toLowerCase().includes("not found")) { // Avoid double toasting if notFound was called
-          toast({
+      if (!errorMessage.toLowerCase().includes("not found")) {
+        toast({
           variant: 'destructive',
           title: 'Error Fetching Ride Details',
           description: errorMessage,
-          });
+        });
       }
     } finally {
       setIsLoading(false);
@@ -96,15 +96,13 @@ export default function RideDetailPage() {
 
   useEffect(() => {
     fetchRideDetails();
-  }, [rideId]); // Removed toast from dependencies as fetchRideDetails is now standalone
+  }, [rideId]);
 
   if (isLoading) {
     return <RideDetailsSkeleton />;
   }
 
   if (error) {
-    // If notFound() was called, this part might not be reached or might show after a brief flash.
-    // This handles other types of errors.
     return (
       <div className="text-center py-10">
         <PageTitle title="Error" description={`Could not load ride details: ${error}`} />
@@ -113,11 +111,10 @@ export default function RideDetailPage() {
       </div>
     );
   }
-  
+
   if (!ride) {
-    // This ensures notFound is called if ride is null after loading and no error was set that implies notFound.
-    // It's a safeguard.
     notFound();
+    return null; // Or a specific component if notFound() doesn't immediately stop rendering
   }
 
   return <RideDetailsPageContent ride={ride} />;
