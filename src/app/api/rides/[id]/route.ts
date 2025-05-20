@@ -10,20 +10,20 @@ const paramsSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } } // Ensure this expects params.id
+  { params }: { params: { id: string } }
 ) {
   try {
     const validation = paramsSchema.safeParse(params);
     if (!validation.success) {
       return NextResponse.json({ message: 'Invalid Ride ID.', errors: validation.error.flatten().fieldErrors }, { status: 400 });
     }
-    const { id: rideId } = validation.data; // Use rideId internally after validating params.id
+    const { id: rideId } = validation.data; // Use validated id
 
     const client = await pool.connect();
     try {
       const rideQuery = `
         SELECT 
-          r.id, 
+          r.id::text, 
           r.name, 
           r.type, 
           r.description,
@@ -34,11 +34,16 @@ export async function GET(
           r.status,
           r.thumbnail_url,
           r.photo_hints,
+          r.distance_km,
           json_build_object(
             'id', c.id::text,
             'name', c.name, 
             'avatarUrl', c.avatar_url,
-            'bikeModel', c.bike_model 
+            'bikeModel', c.bike_model,
+            'is_admin', c.is_admin,
+            'is_verified', c.is_verified,
+            'isCaptain', c.is_captain,
+            'safety_rating', c.safety_rating
           ) as captain
         FROM rides r
         JOIN users c ON r.captain_id = c.id
@@ -56,7 +61,11 @@ export async function GET(
           u.id::text, 
           u.name, 
           u.avatar_url,
-          u.bike_model
+          u.bike_model,
+          u.is_admin,
+          u.is_verified,
+          u.is_captain,
+          u.safety_rating
         FROM users u
         JOIN ride_participants rp ON u.id = rp.user_id
         WHERE rp.ride_id = $1;
@@ -67,6 +76,10 @@ export async function GET(
         name: p.name,
         avatarUrl: p.avatar_url,
         bikeModel: p.bike_model,
+        is_admin: p.is_admin,
+        is_verified: p.is_verified,
+        isCaptain: p.is_captain,
+        safety_rating: p.safety_rating,
       }));
       
       const photosQuery = `
@@ -76,20 +89,24 @@ export async function GET(
           rp.caption,
           json_build_object(
             'id', u.id::text,
-            'name', u.name
+            'name', u.name,
+            'avatarUrl', u.avatar_url
           ) as uploader,
-          rp.data_ai_hint
+          rp.data_ai_hint,
+          rp.uploaded_at
         FROM ride_photos rp
         JOIN users u ON rp.uploader_user_id = u.id
         WHERE rp.ride_id = $1
         ORDER BY rp.uploaded_at DESC;
       `;
-      const photosResult = await client.query(photosQuery, [rideId]).catch(() => ({ rows: [] }));
+      const photosResult = await client.query(photosQuery, [rideId]);
       const photos = photosResult.rows.map(p => ({
+        id: p.id,
         url: p.url,
         uploader: p.uploader as User,
         caption: p.caption,
         dataAiHint: p.data_ai_hint,
+        uploaded_at: new Date(p.uploaded_at).toISOString(),
       }));
 
       const ride: Ride = {
@@ -109,6 +126,7 @@ export async function GET(
         thumbnailUrl: rideData.thumbnail_url,
         photoHints: rideData.photo_hints,
         photos: photos,
+        distance_km: rideData.distance_km ? parseFloat(rideData.distance_km) : undefined,
       };
       
       return NextResponse.json(ride, { status: 200 });
@@ -121,7 +139,7 @@ export async function GET(
     }
   } catch (error) {
     console.error('Get Ride Detail API error:', error);
-    if (error instanceof z.ZodError) {
+    if (error instanceof z.ZodError) { // Should be caught by initial validation
         return NextResponse.json({ message: 'Validation error', errors: error.errors }, { status: 400 });
     }
     return NextResponse.json({ message: 'An unexpected error occurred.' }, { status: 500 });

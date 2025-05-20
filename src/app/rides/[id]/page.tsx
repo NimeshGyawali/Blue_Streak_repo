@@ -47,7 +47,7 @@ function RideDetailsSkeleton() {
 
 export default function RideDetailPage() {
   const params = useParams();
-  const rideId = typeof params.id === 'string' ? params.id : undefined; // Ensure using params.id
+  const rideIdFromParams = typeof params.id === 'string' ? params.id : undefined;
   const [ride, setRide] = useState<Ride | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,19 +55,19 @@ export default function RideDetailPage() {
   const router = useRouter();
 
   async function fetchRideDetails() {
-    if (!rideId) {
+    if (!rideIdFromParams) {
       setIsLoading(false);
-      setError("Ride ID is missing.");
-      notFound();
+      setError("Ride ID is missing from parameters.");
+      notFound(); // Call notFound for invalid/missing ID
       return;
     }
 
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/rides/${rideId}`); // Uses rideId from params.id
+      const response = await fetch(`/api/rides/${rideIdFromParams}`);
       if (response.status === 404) {
-        notFound();
+        notFound(); // Call notFound if API returns 404
         return;
       }
       if (!response.ok) {
@@ -96,7 +96,7 @@ export default function RideDetailPage() {
 
   useEffect(() => {
     fetchRideDetails();
-  }, [rideId]);
+  }, [rideIdFromParams]); // Depend on rideIdFromParams
 
   if (isLoading) {
     return <RideDetailsSkeleton />;
@@ -113,8 +113,10 @@ export default function RideDetailPage() {
   }
 
   if (!ride) {
+    // This case should ideally be handled by notFound() earlier if rideId was invalid or API 404'd
+    // But as a fallback:
     notFound();
-    return null; // Or a specific component if notFound() doesn't immediately stop rendering
+    return null;
   }
 
   return <RideDetailsPageContent ride={ride} />;

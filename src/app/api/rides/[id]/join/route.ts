@@ -28,7 +28,7 @@ async function getAuthenticatedUserIdFromToken(request: NextRequest): Promise<st
     const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
     return decoded.userId;
   } catch (error) {
-    console.error('JWT verification error in join/leave ride:', error);
+    console.error('JWT verification error in join ride:', error);
     return null;
   }
 }
@@ -39,7 +39,7 @@ const rideParamsSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } } // Ensure this expects params.id
+  { params }: { params: { id: string } }
 ) {
   const userId = await getAuthenticatedUserIdFromToken(request);
   if (!userId) {
@@ -50,18 +50,30 @@ export async function POST(
   if (!paramsValidation.success) {
     return NextResponse.json({ message: 'Invalid Ride ID.', errors: paramsValidation.error.flatten().fieldErrors }, { status: 400 });
   }
-  const { id: rideId } = paramsValidation.data; // Use rideId internally after validating params.id
+  const { id: rideId } = paramsValidation.data; // Use validated id
 
   const client = await pool.connect();
   try {
+    // Check if ride exists and is upcoming
     const rideResult = await client.query(
-      "SELECT id, status FROM rides WHERE id = $1 AND status = 'Upcoming'",
+      "SELECT id, status, captain_id FROM rides WHERE id = $1",
       [rideId]
     );
     if (rideResult.rows.length === 0) {
-      return NextResponse.json({ message: 'Ride not found or not available for joining.' }, { status: 404 });
+      return NextResponse.json({ message: 'Ride not found.' }, { status: 404 });
     }
 
+    const ride = rideResult.rows[0];
+    if (ride.status !== 'Upcoming') {
+      return NextResponse.json({ message: `Ride is not upcoming. Current status: ${ride.status}` }, { status: 400 });
+    }
+    
+    if (String(ride.captain_id) === userId) {
+       return NextResponse.json({ message: 'Captain cannot join their own ride as a participant.' }, { status: 400 });
+    }
+
+
+    // Check if user is already a participant
     const existingParticipantResult = await client.query(
       'SELECT user_id FROM ride_participants WHERE ride_id = $1 AND user_id = $2',
       [rideId, userId]
@@ -70,6 +82,7 @@ export async function POST(
       return NextResponse.json({ message: 'You have already joined this ride.' }, { status: 409 });
     }
 
+    // Add user to participants
     await client.query(
       'INSERT INTO ride_participants (ride_id, user_id, joined_at) VALUES ($1, $2, NOW())',
       [rideId, userId]

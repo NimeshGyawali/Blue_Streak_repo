@@ -28,7 +28,7 @@ async function getAuthenticatedUserIdFromToken(request: NextRequest): Promise<st
     const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
     return decoded.userId;
   } catch (error) {
-    console.error('JWT verification error in join/leave ride:', error);
+    console.error('JWT verification error in leave ride:', error);
     return null;
   }
 }
@@ -37,9 +37,9 @@ const rideParamsSchema = z.object({
   id: z.string().uuid("Invalid Ride ID format."),
 });
 
-export async function POST(
+export async function POST( 
   request: NextRequest,
-  { params }: { params: { id: string } } // Ensure this expects params.id
+  { params }: { params: { id: string } }
 ) {
   const userId = await getAuthenticatedUserIdFromToken(request);
   if (!userId) {
@@ -50,15 +50,17 @@ export async function POST(
   if (!paramsValidation.success) {
     return NextResponse.json({ message: 'Invalid Ride ID.', errors: paramsValidation.error.flatten().fieldErrors }, { status: 400 });
   }
-  const { id: rideId } = paramsValidation.data; // Use rideId internally after validating params.id
+  const { id: rideId } = paramsValidation.data; // Use validated id
 
   const client = await pool.connect();
   try {
+    // Check if ride exists (user can only leave if ride exists)
     const rideResult = await client.query('SELECT id FROM rides WHERE id = $1', [rideId]);
     if (rideResult.rows.length === 0) {
       return NextResponse.json({ message: 'Ride not found.' }, { status: 404 });
     }
 
+    // Remove user from participants
     const deleteResult = await client.query(
       'DELETE FROM ride_participants WHERE ride_id = $1 AND user_id = $2 RETURNING user_id',
       [rideId, userId]

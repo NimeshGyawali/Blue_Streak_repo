@@ -25,7 +25,7 @@ const ChatMessage = ({ user, message, time }: { user: User, message: string, tim
   <div className="flex items-start gap-2.5 p-3 hover:bg-muted/50 rounded-md">
     <Avatar className="h-8 w-8">
       <AvatarImage src={user.avatarUrl || `https://placehold.co/40x40.png`} alt={user.name} data-ai-hint="person avatar"/>
-      <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+      <AvatarFallback>{user.name?.charAt(0) || 'U'}</AvatarFallback>
     </Avatar>
     <div className="flex flex-col w-full max-w-[320px] leading-1.5">
       <div className="flex items-center space-x-2 rtl:space-x-reverse">
@@ -64,8 +64,7 @@ export function RideDetailsPageContent({ ride: initialRide }: RideDetailsPageCon
     if (isJoiningOrLeaving) return;
 
     setIsJoiningOrLeaving(true);
-    // Ensure the API endpoint uses ride.id, which comes from the validated params.id
-    const endpoint = `/api/rides/${ride.id}/${action}`;
+    const endpoint = `/api/rides/${ride.id}/${action}`; // Uses ride.id consistently
 
     try {
       const response = await fetch(endpoint, {
@@ -83,21 +82,20 @@ export function RideDetailsPageContent({ ride: initialRide }: RideDetailsPageCon
 
       toast({ title: `Successfully ${action === 'join' ? 'Joined' : 'Left'} Ride`, description: result.message });
       
-      // Optimistic UI update
-      if (action === 'join') {
+      // Optimistic UI update for participant status and list
+      if (action === 'join' && user) {
         setIsCurrentUserParticipant(true);
         setRide(prevRide => ({
           ...prevRide,
           participants: prevRide.participants.find(p => p.id === user.id) ? prevRide.participants : [...prevRide.participants, user]
         }));
-      } else {
+      } else if (action === 'leave' && user) {
         setIsCurrentUserParticipant(false);
         setRide(prevRide => ({
           ...prevRide,
           participants: prevRide.participants.filter(p => p.id !== user.id)
         }));
       }
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : `An unknown error occurred while trying to ${action} the ride.`;
       toast({ variant: 'destructive', title: `${action.charAt(0).toUpperCase() + action.slice(1)} Ride Failed`, description: errorMessage });
@@ -113,8 +111,10 @@ export function RideDetailsPageContent({ ride: initialRide }: RideDetailsPageCon
   ];
 
   const galleryPhotos = ride.photos?.length ? ride.photos : [
-    { id: 'ph1', url: ride.thumbnailUrl || 'https://placehold.co/300x200.png', uploader: ride.captain, caption: 'Ride Thumbnail (Placeholder)', dataAiHint: ride.photoHints || 'motorcycle group' },
+    { id: 'ph1', url: ride.thumbnailUrl || 'https://placehold.co/300x200.png', uploader: ride.captain, caption: 'Ride Thumbnail (Placeholder)', dataAiHint: ride.photoHints || 'motorcycle group', uploaded_at: new Date().toISOString() },
   ];
+
+  const isCaptain = user && user.id === ride.captain.id;
 
   return (
     <div className="space-y-8">
@@ -178,7 +178,7 @@ export function RideDetailsPageContent({ ride: initialRide }: RideDetailsPageCon
           </div>
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold text-foreground">Ride Actions</h2>
-            {!authLoading && user && ride.status === 'Upcoming' && (
+            {!authLoading && user && ride.status === 'Upcoming' && !isCaptain && (
               isCurrentUserParticipant ? (
                 <Button 
                   className="w-full" 
@@ -202,6 +202,9 @@ export function RideDetailsPageContent({ ride: initialRide }: RideDetailsPageCon
                 <Button className="w-full" onClick={() => router.push('/auth/login?redirect=/rides/' + ride.id)}>
                     <LogIn className="mr-2 h-4 w-4" /> Login to Join
                 </Button>
+            )}
+            {isCaptain && ride.status === 'Upcoming' && (
+                <Button className="w-full" variant="outline" disabled>You are the Captain</Button>
             )}
             {ride.status === 'Ongoing' && (
               <Button className="w-full" disabled>Ride In Progress</Button>
@@ -227,7 +230,7 @@ export function RideDetailsPageContent({ ride: initialRide }: RideDetailsPageCon
 
       <Tabs defaultValue="participants" className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
-          <TabsTrigger value="participants" className="flex items-center gap-1"><Users size={16}/>Participants ({ride.participants.length + 1})</TabsTrigger> {/* +1 for captain */}
+          <TabsTrigger value="participants" className="flex items-center gap-1"><Users size={16}/>Participants ({ride.participants.length + (isCaptain ? 0 : 1) })</TabsTrigger> {/* +1 for captain if not in participants list */}
           <TabsTrigger value="chat" className="flex items-center gap-1"><MessageCircle size={16}/>Group Chat</TabsTrigger>
           <TabsTrigger value="gallery" className="flex items-center gap-1"><ImageIcon size={16}/>Photo Gallery</TabsTrigger>
           <TabsTrigger value="upload" className="flex items-center gap-1"><UploadCloud size={16}/>Upload Photos</TabsTrigger>
@@ -236,22 +239,47 @@ export function RideDetailsPageContent({ ride: initialRide }: RideDetailsPageCon
         <TabsContent value="participants">
           <Card>
             <CardHeader>
-              <CardTitle>Participants ({ride.participants.length + 1})</CardTitle>
+              <CardTitle>Participants ({ride.participants.length + (isCaptain ? 0 : 1)})</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {[ride.captain, ...ride.participants].map((pUser, index) => (
+              {/* Display Captain First if not already in participants list */}
+              {isCaptain ? (
+                 <div key={ride.captain.id} className="flex items-center gap-3 p-3 bg-blue-500/10 hover:bg-blue-500/20 rounded-md transition-colors">
+                    <Avatar>
+                        <AvatarImage src={ride.captain.avatarUrl || `https://placehold.co/40x40.png`} alt={ride.captain.name} data-ai-hint="person avatar" />
+                        <AvatarFallback>{ride.captain.name?.charAt(0) || 'C'}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <p className="font-medium text-primary">{ride.captain.name} <Badge variant="default" className="ml-2">Captain</Badge></p>
+                        {ride.captain.bikeModel && <p className="text-xs text-muted-foreground">{ride.captain.bikeModel}</p>}
+                    </div>
+                </div>
+              ) : (
+                 <div key={ride.captain.id} className="flex items-center gap-3 p-3 bg-muted/20 hover:bg-muted/50 rounded-md transition-colors">
+                    <Avatar>
+                        <AvatarImage src={ride.captain.avatarUrl || `https://placehold.co/40x40.png`} alt={ride.captain.name} data-ai-hint="person avatar" />
+                        <AvatarFallback>{ride.captain.name?.charAt(0) || 'C'}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <p className="font-medium text-foreground">{ride.captain.name} <Badge variant="secondary" className="ml-2">Captain</Badge></p>
+                        {ride.captain.bikeModel && <p className="text-xs text-muted-foreground">{ride.captain.bikeModel}</p>}
+                    </div>
+                </div>
+              )}
+
+              {ride.participants.map((pUser, index) => (
                 <div key={pUser.id || `participant-${index}`} className="flex items-center gap-3 p-3 bg-muted/20 hover:bg-muted/50 rounded-md transition-colors">
                   <Avatar>
                     <AvatarImage src={pUser.avatarUrl || `https://placehold.co/40x40.png`} alt={pUser.name} data-ai-hint="person avatar" />
-                    <AvatarFallback>{pUser.name?.charAt(0) || 'U'}</AvatarFallback>
+                    <AvatarFallback>{pUser.name?.charAt(0) || 'P'}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium text-foreground">{pUser.name} {pUser.id === ride.captain.id && <Badge variant="secondary" className="ml-2">Captain</Badge>}</p>
+                    <p className="font-medium text-foreground">{pUser.name}</p>
                     {pUser.bikeModel && <p className="text-xs text-muted-foreground">{pUser.bikeModel}</p>}
                   </div>
                 </div>
               ))}
-               {ride.participants.length === 0 && (!user || ride.captain.id !== user?.id) && ( 
+               {ride.participants.length === 0 && !isCaptain && ( 
                 <p className="text-muted-foreground text-center py-4">Be the first to join this ride!</p>
               )}
             </CardContent>
