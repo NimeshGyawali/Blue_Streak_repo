@@ -2,7 +2,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { JWT_SECRET } from '../../../../../lib/authConstants'; // Corrected relative path
 import jwt from 'jsonwebtoken';
-// import { pool } from '@/lib/db'; // For when you connect to the DB
+// import { pool } from '@/lib/db'; // Uncomment when connecting to the DB
 
 interface DecodedToken {
   userId: string;
@@ -18,7 +18,7 @@ interface AdminAuthResult {
 }
 
 
-// TODO: Replace this with your actual admin authentication logic
+// Updated to use JWT for admin check
 async function checkAdminStatus(request: NextRequest): Promise<AdminAuthResult> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -64,12 +64,50 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: adminAuth.error || 'Forbidden: Administrator access required.' }, { status: adminAuth.status || 403 });
   }
 
-    // TODO: Replace with actual database queries
+    // --- TODO: Replace with actual database queries ---
     // You'll need to:
-    // 1. Fetch chapters/groups.
-    // 2. For each chapter, count rides this month.
-    // 3. Count members in each chapter.
-    // 4. Determine if isBelowThreshold.
+    // 1. Define how "Chapters" or "Groups" are stored in your database.
+    //    - e.g., a `chapters` table with `id`, `name`.
+    //    - A way to link users to chapters (e.g., `user_chapters` join table or a `chapter_id` on the `users` table).
+    // 2. Fetch all chapters.
+    // 3. For each chapter:
+    //    a. Query the `users` (or `user_chapters`) table to count `membersCount`.
+    //    b. Query the `rides` table (potentially filtering by a `chapter_id` on rides or by rides captained/participated by chapter members)
+    //       to count `ridesThisMonth` (rides with `date_time` in the current month and an appropriate status like 'Completed', 'Upcoming', 'Ongoing').
+    //    c. Determine `isBelowThreshold` based on `ridesThisMonth` and `MIN_MONTHLY_RIDES_THRESHOLD`.
+
+    // const client = await pool.connect();
+    // try {
+    //   // Example conceptual query (adjust to your schema):
+    //   // const chaptersResult = await client.query('SELECT id, name FROM chapters ORDER BY name;');
+    //   // const chapterActivityData: ChapterActivity[] = [];
+    //   // for (const chapter of chaptersResult.rows) {
+    //   //   const membersCountResult = await client.query('SELECT COUNT(*) as count FROM users WHERE chapter_id = $1', [chapter.id]); // or join table
+    //   //   const ridesThisMonthResult = await client.query(
+    //   //     `SELECT COUNT(*) as count FROM rides
+    //   //      WHERE chapter_id = $1  // Or link rides to chapters differently
+    //   //      AND date_trunc('month', date_time) = date_trunc('month', CURRENT_DATE)
+    //   //      AND status IN ('Completed', 'Upcoming', 'Ongoing')`,
+    //   //     [chapter.id]
+    //   //   );
+    //   //   const ridesThisMonth = parseInt(ridesThisMonthResult.rows[0].count, 10);
+    //   //   chapterActivityData.push({
+    //   //     id: String(chapter.id),
+    //   //     name: chapter.name,
+    //   //     ridesThisMonth: ridesThisMonth,
+    //   //     membersCount: parseInt(membersCountResult.rows[0].count, 10),
+    //   //     isBelowThreshold: ridesThisMonth < MIN_MONTHLY_RIDES_THRESHOLD,
+    //   //   });
+    //   // }
+    //   // return NextResponse.json(chapterActivityData, { status: 200 });
+    // } catch (dbError) {
+    //   console.error('Get Chapter Activity DB error:', dbError);
+    //   return NextResponse.json({ message: 'Database error while fetching chapter activity.' }, { status: 500 });
+    // } finally {
+    //   client.release();
+    // }
+
+    // Returning structured mock data for now
     const mockChapterActivity: ChapterActivity[] = [
       { id: 'chapter1', name: 'Downtown Riders', ridesThisMonth: 6, membersCount: 35, isBelowThreshold: false },
       { id: 'chapter2', name: 'Westside Wheelers', ridesThisMonth: 1, membersCount: 12, isBelowThreshold: true },
